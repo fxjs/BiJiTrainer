@@ -1,0 +1,174 @@
+import type { Card, Lane } from '@biji/core'
+import type { GradeDTO } from '../worker/protocol'
+import type { Board, SortMode } from '../practice/board'
+import { defineStore } from 'pinia'
+import { computed, ref, shallowRef } from 'vue'
+import { evaluateInWorker } from '../composables/solverClient'
+import {
+  clearLanes,
+  createBoard,
+  dealHand,
+  foulCheck,
+  isComplete,
+  laneInfo,
+  placeSelected,
+  poolCards,
+  removeFromLane,
+  toggleSelect,
+} from '../practice/board'
+import { sound } from '../sound'
+import { useSettingsStore } from './settings'
+
+/** 蒙特卡洛采样局数：约 1 秒，均值标准误约 0.2~0.5 分 */
+const SAMPLES = 2000
+
+/** arranging 摆牌中；evaluating 等待求解；result 显示评估结果 */
+export type Phase = 'arranging' | 'evaluating' | 'result'
+
+export interface SessionStats {
+  hands: number
+  best: number
+  foul: number
+  /** 累计期望损失（分） */
+  evLossSum: number
+  /** 当前连续最优次数 */
+  streak: number
+}
+
+export const usePracticeStore = defineStore('practice', () => {
+  const settings = useSettingsStore()
+
+  const board = shallowRef<Board>(createBoard(dealHand()))
+  const sortMode = ref<SortMode>('suit')
+  const phase = ref<Phase>('arranging')
+  const result = shallowRef<GradeDTO | null>(null)
+  const error = ref<string | null>(null)
+  const stats = ref<SessionStats>({ hands: 0, best: 0, foul: 0, evLossSum: 0, streak: 0 })
+
+  const pool = computed(() => poolCards(board.value, sortMode.value))
+  const lanes = computed(() => ([0, 1, 2] as Lane[]).map(l => ({
+    cards: board.value.lanes[l],
+    info: laneInfo(board.value, l),
+  })))
+  const foul = computed(() => foulCheck(board.value))
+  const complete = computed(() => isComplete(board.value))
+  const selected = computed(() => board.value.selected)
+
+  function update(next: Board): boolean {
+    if (next === board.value)
+      return false
+    board.value = next
+    return true
+  }
+
+  function newHand() {
+    board.value = createBoard(dealHand())
+    phase.value = 'arranging'
+    result.value = null
+    error.value = null
+    sound.play('deal')
+  }
+
+  /** 同一手牌重新摆 */
+  function retry() {
+    board.value = clearLanes(board.value)
+    phase.value = 'arranging'
+    result.value = null
+    error.value = null
+  }
+
+  function toggle(card: Card) {
+    if (phase.value !== 'arranging')
+      return
+    if (update(toggleSelect(board.value, card)))
+      sound.play('select')
+  }
+
+  function place(lane: Lane) {
+    if (phase.value !== 'arranging')
+      return
+    if (update(placeSelected(board.value, lane))) {
+      sound.play('place')
+      if (complete.value)
+        sound.play(foul.value.any ? 'foulWarn' : 'ready')
+    }
+  }
+
+  function unplace(lane: Lane, card: Card) {
+    if (phase.value !== 'arranging')
+      return
+    if (update(removeFromLane(board.value, lane, card)))
+      sound.play('unplace')
+  }
+
+  function clear() {
+    if (phase.value === 'arranging')
+      update(clearLanes(board.value))
+  }
+
+  async function submit() {
+    if (phase.value !== 'arranging' || !complete.value)
+      return
+    phase.value = 'evaluating'
+    error.value = null
+    const b = board.value
+    try {
+      const seed = crypto.getRandomValues(new Uint32Array(1))[0]
+      const r = await evaluateInWorker({
+        hand: [...b.hand],
+        player: [[...b.lanes[0]], [...b.lanes[1]], [...b.lanes[2]]],
+        lambda: settings.lambda,
+        samples: SAMPLES,
+        seed,
+      })
+      result.value = r
+      phase.value = 'result'
+      record(r)
+    }
+    catch (e) {
+      error.value = e instanceof Error ? e.message : String(e)
+      phase.value = 'arranging'
+    }
+  }
+
+  function record(r: GradeDTO) {
+    const s = stats.value
+    s.hands++
+    s.evLossSum += r.evLoss
+    if (r.verdict === 'best') {
+      s.best++
+      sound.play('best', { streak: s.streak })
+      s.streak++
+    }
+    else {
+      s.streak = 0
+      if (r.verdict === 'foul')
+        s.foul++
+      sound.play(r.verdict)
+    }
+    // 玩家本手成喜时，评级音之后再补一声
+    if (r.player.xi.length > 0)
+      setTimeout(() => sound.play('xi'), 450)
+  }
+
+  return {
+    board,
+    sortMode,
+    phase,
+    result,
+    error,
+    stats,
+    pool,
+    lanes,
+    foul,
+    complete,
+    selected,
+    newHand,
+    retry,
+    toggle,
+    place,
+    unplace,
+    clear,
+    submit,
+  }
+})

@@ -1,3 +1,4 @@
+export * from './grade'
 export * from './mc'
 export * from './model'
 export * from './policy'

@@ -1,0 +1,10 @@
+{
+  "name": "@biji/audio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "比鸡音效：Web Audio 实时合成，训练与对战共用",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

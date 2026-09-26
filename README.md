@@ -7,8 +7,17 @@
 - `packages/core`：规则引擎（牌编码、牌型强度、摆法与倒水、喜牌、结算）
 - `packages/solver`：胜率表模型、摆牌策略、蒙特卡洛精排、推荐（U = EV − λ·σ）
 - `packages/solver/data`：自博弈训练的胜率表与训练统计
+- `packages/audio`：音效（Web Audio 实时合成）
+- `apps/trainer`：训练 H5（Vite + Vue 3 + Pinia + UnoCSS），求解在 Web Worker 中运行
 - `scripts/tables`：胜率表训练脚本
 - `scripts/golden`：从 ThinkBiJi 的 Python 参考实现导出对拍基准
+
+## 开发
+
+```bash
+pnpm install
+pnpm dev       # 启动训练 H5 的开发服务器（apps/trainer）
+```
 
 ## 测试
 

@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.26.1",
   "scripts": {
+    "dev": "pnpm --filter @biji/trainer dev",
     "test": "vitest run",
     "golden": "python3 scripts/golden/export_strength.py > packages/core/test/fixtures/strength-golden.json && python3 scripts/golden/export_model.py",
     "tables": "tsx scripts/tables/gen-tables.ts"
