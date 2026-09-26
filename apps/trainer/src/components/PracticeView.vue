@@ -8,7 +8,7 @@ import PlayingCard from './PlayingCard.vue'
 import ResultPanel from './ResultPanel.vue'
 
 const practice = usePracticeStore()
-const { pool, lanes, foul, complete, selected, phase, result, error, sortMode } = storeToRefs(practice)
+const { pool, lanes, foul, complete, selected, phase, result, error, sortMode, source } = storeToRefs(practice)
 
 const arranging = computed(() => phase.value === 'arranging')
 
@@ -51,6 +51,9 @@ const hint = computed(() => {
 
 <template>
   <div class="practice">
+    <p v-if="source.kind === 'review' && phase !== 'result'" class="review-note">
+      错题复习：花色已做同色置换
+    </p>
     <div class="table">
       <LaneRow
         v-for="l in order"
@@ -114,6 +117,7 @@ const hint = computed(() => {
     <ResultPanel
       v-else-if="result"
       :result="result"
+      :source="source.kind"
       @retry="practice.retry()"
       @next="practice.newHand()"
     />
@@ -124,6 +128,12 @@ const hint = computed(() => {
 .practice {
   display: grid;
   gap: 14px;
+}
+
+.review-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v-minor);
 }
 
 .table {

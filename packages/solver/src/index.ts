@@ -1,3 +1,5 @@
+export * from './diagnose'
+export * from './fold'
 export * from './grade'
 export * from './mc'
 export * from './model'

@@ -2,7 +2,7 @@ import type { Arrangement, Triple } from '@biji/core'
 import type { ScoredArrangement } from '@biji/solver'
 import type { EvaluateRequest, EvaluateResponse, ScoredDTO } from './protocol'
 import { compositionXi, xiOf } from '@biji/core'
-import { arrangementKey, grade, recommend } from '@biji/solver'
+import { arrangementKey, diagnose, grade, recommend } from '@biji/solver'
 import { defaultModel } from '@biji/solver/default-model'
 
 /** 结果页展示的备选摆法数量 */
@@ -48,6 +48,15 @@ scope.onmessage = (e) => {
       extra: [player],
     })
     const g = grade(rec)
+    const tags = g.verdict === 'best'
+      ? []
+      : diagnose({
+          hand: req.hand,
+          player,
+          playerFirst: g.player.stat.laneFirst,
+          best: g.best.arrangement,
+          bestFirst: g.best.stat.laneFirst,
+        })
     const bestKey = arrangementKey(g.best.arrangement)
     const playerKey = arrangementKey(g.player.arrangement)
     res = {
@@ -63,6 +72,7 @@ scope.onmessage = (e) => {
           .filter(s => !s.foul && ![bestKey, playerKey].includes(arrangementKey(s.arrangement)))
           .slice(0, ALTERNATIVES)
           .map(toDTO),
+        tags,
         legalCount: rec.legalCount,
         samples: req.samples,
         lambda: req.lambda,

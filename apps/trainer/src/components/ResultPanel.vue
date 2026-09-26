@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { PracticeSource } from '../stores/records'
 import type { GradeDTO } from '../worker/protocol'
 import { VERDICT_NAME } from '@biji/solver'
 import { computed, ref } from 'vue'
 import { signed } from '../format'
 import ArrangementView from './ArrangementView.vue'
 
-const props = defineProps<{ result: GradeDTO }>()
+const props = defineProps<{ result: GradeDTO, source: PracticeSource['kind'] }>()
 defineEmits<{ retry: [], next: [] }>()
 
 const showAlternatives = ref(false)
@@ -14,6 +15,12 @@ const showAlternatives = ref(false)
 const sameAsBest = computed(() =>
   props.result.player.lanes.every((l, i) =>
     [...l].sort((a, b) => a - b).join() === [...props.result.best.lanes[i]].sort((a, b) => a - b).join()))
+
+const sourceNote = computed(() => ({
+  free: '',
+  review: '错题复习：最优则按间隔推迟下次复习，失误则重新开始。',
+  retry: '重摆：看过推荐摆法后的结果，不计入记录与错题本。',
+})[props.source])
 
 const summary = computed(() => {
   const r = props.result
@@ -36,6 +43,17 @@ const summary = computed(() => {
       <strong>{{ VERDICT_NAME[result.verdict] }}</strong>
       <span>{{ summary }}</span>
     </div>
+
+    <p v-if="sourceNote" class="source">
+      {{ sourceNote }}
+    </p>
+
+    <ul v-if="result.tags.length" class="tags">
+      <li v-for="t in result.tags" :key="t.code">
+        <strong>{{ t.title }}</strong>
+        <span>{{ t.detail }}</span>
+      </li>
+    </ul>
 
     <ArrangementView
       title="你的摆法"
@@ -111,6 +129,38 @@ const summary = computed(() => {
 .verdict.minor { color: var(--v-minor); }
 .verdict.mistake { color: var(--v-mistake); }
 .verdict.foul { color: var(--v-foul); }
+
+.source {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.tags li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.tags strong {
+  font-size: 14px;
+}
+
+.tags span {
+  font-size: 13px;
+  color: var(--muted);
+}
 
 .alts {
   display: grid;

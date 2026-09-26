@@ -121,4 +121,27 @@ describe('弃牌', () => {
     expect(() => settle(seats.map((_, i) => ({ foldOrder: i + 1 })))).toThrow()
     expect(nextLeaderSeat(seats)).toBeNull()
   })
+
+  // 本桌规则下弃牌在名次分上被"不弃"压制：前面已有 f 人弃牌时，自己弃牌付 3(5−f)；
+  // 不弃则场上最多 6−f 人摆牌，每道最多付 5−f，三道合计同样是 3(5−f)。
+  it('未弃牌者三道名次分合计 ≥ −3 × (摆牌人数 − 1)，不低于其弃牌成本', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const deck = shuffled(seed)
+      const folders = seed % 5
+      const input = [...Array(6).keys()].map(i =>
+        i < folders ? { foldOrder: i + 1 } : greedy(deck.slice(i * 9, i * 9 + 9)))
+      const res = settle(input)
+      const active = 6 - folders
+      res.forEach((r, i) => {
+        if (r.folded)
+          return
+        const lanes = r.lanePoints[0] + r.lanePoints[1] + r.lanePoints[2]
+        expect(lanes).toBeGreaterThanOrEqual(-3 * (active - 1))
+        // 该座位若改为弃牌，是第 (之前弃牌人数 + 1) 个
+        const before = Math.min(i, folders)
+        expect(lanes).toBeGreaterThanOrEqual(-foldCost(before + 1))
+      })
+    }
+  })
 })
+

@@ -1,6 +1,8 @@
 import type { Card, Lane } from '@biji/core'
-import type { GradeDTO } from '../worker/protocol'
 import type { Board, SortMode } from '../practice/board'
+import type { MistakeItem } from '../review/srs'
+import type { GradeDTO } from '../worker/protocol'
+import type { PracticeSource } from './records'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { evaluateInWorker } from '../composables/solverClient'
@@ -16,7 +18,9 @@ import {
   removeFromLane,
   toggleSelect,
 } from '../practice/board'
+import { PERMUTATION_COUNT, permuteSuits } from '../review/permute'
 import { sound } from '../sound'
+import { useRecordsStore } from './records'
 import { useSettingsStore } from './settings'
 
 /** 蒙特卡洛采样局数：约 1 秒，均值标准误约 0.2~0.5 分 */
@@ -37,6 +41,7 @@ export interface SessionStats {
 
 export const usePracticeStore = defineStore('practice', () => {
   const settings = useSettingsStore()
+  const records = useRecordsStore()
 
   const board = shallowRef<Board>(createBoard(dealHand()))
   const sortMode = ref<SortMode>('suit')
@@ -44,6 +49,7 @@ export const usePracticeStore = defineStore('practice', () => {
   const result = shallowRef<GradeDTO | null>(null)
   const error = ref<string | null>(null)
   const stats = ref<SessionStats>({ hands: 0, best: 0, foul: 0, evLossSum: 0, streak: 0 })
+  const source = ref<PracticeSource>({ kind: 'free' })
 
   const pool = computed(() => poolCards(board.value, sortMode.value))
   const lanes = computed(() => ([0, 1, 2] as Lane[]).map(l => ({
@@ -63,15 +69,28 @@ export const usePracticeStore = defineStore('practice', () => {
 
   function newHand() {
     board.value = createBoard(dealHand())
+    source.value = { kind: 'free' }
     phase.value = 'arranging'
     result.value = null
     error.value = null
     sound.play('deal')
   }
 
-  /** 同一手牌重新摆 */
+  /** 复习错题：随机做一次同色花色置换后重新摆 */
+  function startReview(item: MistakeItem) {
+    const variant = crypto.getRandomValues(new Uint32Array(1))[0] % PERMUTATION_COUNT
+    board.value = createBoard(permuteSuits(item.hand, variant))
+    source.value = { kind: 'review', id: item.id }
+    phase.value = 'arranging'
+    result.value = null
+    error.value = null
+    sound.play('deal')
+  }
+
+  /** 同一手牌重新摆：看过推荐摆法后的结果不计入记录、错题本与本次统计 */
   function retry() {
     board.value = clearLanes(board.value)
+    source.value = { kind: 'retry' }
     phase.value = 'arranging'
     result.value = null
     error.value = null
@@ -123,7 +142,8 @@ export const usePracticeStore = defineStore('practice', () => {
       })
       result.value = r
       phase.value = 'result'
-      record(r)
+      record(r, source.value.kind !== 'retry')
+      void records.save(r, [...b.hand], source.value)
     }
     catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
@@ -131,19 +151,26 @@ export const usePracticeStore = defineStore('practice', () => {
     }
   }
 
-  function record(r: GradeDTO) {
+  /** 播放评级音效；counted 为 false 时（重摆）不计入本次统计与连击 */
+  function record(r: GradeDTO, counted: boolean) {
     const s = stats.value
-    s.hands++
-    s.evLossSum += r.evLoss
+    if (counted) {
+      s.hands++
+      s.evLossSum += r.evLoss
+    }
     if (r.verdict === 'best') {
-      s.best++
-      sound.play('best', { streak: s.streak })
-      s.streak++
+      sound.play('best', { streak: counted ? s.streak : 0 })
+      if (counted) {
+        s.best++
+        s.streak++
+      }
     }
     else {
-      s.streak = 0
-      if (r.verdict === 'foul')
-        s.foul++
+      if (counted) {
+        s.streak = 0
+        if (r.verdict === 'foul')
+          s.foul++
+      }
       sound.play(r.verdict)
     }
     // 玩家本手成喜时，评级音之后再补一声
@@ -158,12 +185,14 @@ export const usePracticeStore = defineStore('practice', () => {
     result,
     error,
     stats,
+    source,
     pool,
     lanes,
     foul,
     complete,
     selected,
     newHand,
+    startReview,
     retry,
     toggle,
     place,

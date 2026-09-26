@@ -1,5 +1,5 @@
 import type { Card, LaneStrengths, Xi } from '@biji/core'
-import type { Verdict } from '@biji/solver'
+import type { Tag, Verdict } from '@biji/solver'
 
 /** 主线程 → Worker：评估玩家摆法 */
 export interface EvaluateRequest {
@@ -39,6 +39,8 @@ export interface GradeDTO {
   best: ScoredDTO
   /** 推荐摆法之外、效用最高的若干摆法 */
   alternatives: ScoredDTO[]
+  /** 错因诊断；评级为最优时为空 */
+  tags: Tag[]
   legalCount: number
   samples: number
   lambda: number

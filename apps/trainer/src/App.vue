@@ -1,16 +1,36 @@
 <script setup lang="ts">
+import type { MistakeItem } from './review/srs'
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import MistakeBook from './components/MistakeBook.vue'
 import PracticeView from './components/PracticeView.vue'
 import SettingsSheet from './components/SettingsSheet.vue'
+import StatsView from './components/StatsView.vue'
 import { usePracticeStore } from './stores/practice'
+import { useRecordsStore } from './stores/records'
 import { useSettingsStore } from './stores/settings'
 import { sound } from './sound'
 
 // 提前创建 settings store，使音效选项在首次播放前同步
 useSettingsStore()
-const { stats } = storeToRefs(usePracticeStore())
+const practice = usePracticeStore()
+const records = useRecordsStore()
+const { stats } = storeToRefs(practice)
+const { dueMistakes } = storeToRefs(records)
 const settingsOpen = ref(false)
+
+type Tab = 'practice' | 'mistakes' | 'stats'
+const tab = ref<Tab>('practice')
+const TABS: { id: Tab, label: string }[] = [
+  { id: 'practice', label: '练习' },
+  { id: 'mistakes', label: '错题本' },
+  { id: 'stats', label: '统计' },
+]
+
+function review(item: MistakeItem) {
+  practice.startReview(item)
+  tab.value = 'practice'
+}
 
 const summary = computed(() => {
   const s = stats.value
@@ -22,7 +42,10 @@ const summary = computed(() => {
 
 // iOS Safari 只允许在用户手势内启动音频，每次手势都尝试解锁（已解锁时无开销）
 const unlock = () => sound.unlock()
-onMounted(() => document.addEventListener('pointerdown', unlock, { capture: true, passive: true }))
+onMounted(() => {
+  document.addEventListener('pointerdown', unlock, { capture: true, passive: true })
+  void records.init()
+})
 onBeforeUnmount(() => document.removeEventListener('pointerdown', unlock, { capture: true }))
 </script>
 
@@ -42,8 +65,25 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', unlock, { capt
       </button>
     </header>
 
+    <nav class="tabs" aria-label="页面">
+      <button
+        v-for="t in TABS"
+        :key="t.id"
+        type="button"
+        :class="{ active: tab === t.id }"
+        :aria-current="tab === t.id ? 'page' : undefined"
+        @click="tab = t.id"
+      >
+        {{ t.label }}
+        <span v-if="t.id === 'mistakes' && dueMistakes.length" class="badge num">{{ dueMistakes.length }}</span>
+      </button>
+    </nav>
+
     <main>
-      <PracticeView />
+      <!-- 练习页用 v-show 保留摆到一半的台面 -->
+      <PracticeView v-show="tab === 'practice'" />
+      <MistakeBook v-if="tab === 'mistakes'" @review="review" />
+      <StatsView v-if="tab === 'stats'" />
     </main>
 
     <SettingsSheet v-model:open="settingsOpen" />
@@ -71,6 +111,41 @@ h1 {
   font-family: var(--serif);
   font-size: 20px;
   font-weight: 900;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tabs button {
+  position: relative;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px 8px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tabs button.active {
+  color: var(--ink);
+  border-bottom-color: var(--felt);
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 2px;
+  border-radius: 9px;
+  background: var(--v-minor);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
 }
 
 .sub {
