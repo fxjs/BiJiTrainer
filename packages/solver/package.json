@@ -1,0 +1,14 @@
+{
+  "name": "@biji/solver",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "比鸡摆法求解：胜率表模型、摆牌策略、蒙特卡洛精排、推荐",
+  "exports": {
+    ".": "./src/index.ts",
+    "./default-model": "./src/defaultModel.ts"
+  },
+  "dependencies": {
+    "@biji/core": "workspace:*"
+  }
+}

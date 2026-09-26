@@ -5,9 +5,12 @@
   "packageManager": "pnpm@10.26.1",
   "scripts": {
     "test": "vitest run",
-    "golden": "python3 scripts/golden/export_strength.py > packages/core/test/fixtures/strength-golden.json"
+    "golden": "python3 scripts/golden/export_strength.py > packages/core/test/fixtures/strength-golden.json && python3 scripts/golden/export_model.py",
+    "tables": "tsx scripts/tables/gen-tables.ts"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"
   }
