@@ -1,0 +1,14 @@
+{
+  "name": "biji-trainer",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "test": "vitest run",
+    "golden": "python3 scripts/golden/export_strength.py > packages/core/test/fixtures/strength-golden.json"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}

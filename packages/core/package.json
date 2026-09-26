@@ -1,0 +1,10 @@
+{
+  "name": "@biji/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "六人比鸡规则引擎：牌编码、牌型强度、摆法与倒水、喜牌、结算",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
