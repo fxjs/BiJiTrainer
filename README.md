@@ -27,3 +27,11 @@ pnpm test      # 含与 Python 参考实现的全组合对拍
 pnpm golden    # 重新生成对拍基准，需要 ../ThinkBiJi/sim（含 model.pkl）或环境变量 THINKBIJI_SIM
 pnpm tables    # 重新训练胜率表，约 50 秒
 ```
+
+## 部署
+
+推送到 `main` 后，[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) 会构建 `apps/trainer` 并发布到 GitHub Pages：
+
+<https://fxjs.github.io/BiJiTrainer/>
+
+构建保留相对路径（`vite.config.ts` 的 `base: './'`），所以产物也可以直接放到任意静态服务器的二级目录。
