@@ -13,15 +13,16 @@ import {
   foulCheck,
   isComplete,
   laneInfo,
+  moveLane,
   placeSelected,
   poolCards,
   removeFromLane,
+  setCardSelected,
   toggleSelect,
 } from '../practice/board'
 import { PERMUTATION_COUNT, permuteSuits } from '../review/permute'
 import { sound } from '../sound'
 import { useRecordsStore } from './records'
-import { useSettingsStore } from './settings'
 
 /** 蒙特卡洛采样局数：约 1 秒，均值标准误约 0.2~0.5 分 */
 const SAMPLES = 2000
@@ -40,7 +41,6 @@ export interface SessionStats {
 }
 
 export const usePracticeStore = defineStore('practice', () => {
-  const settings = useSettingsStore()
   const records = useRecordsStore()
 
   const board = shallowRef<Board>(createBoard(dealHand()))
@@ -103,6 +103,22 @@ export const usePracticeStore = defineStore('practice', () => {
       sound.play('select')
   }
 
+  /** 滑动多选：把一张牌设为选中/未选中，已处于目标状态时不重复播放音效 */
+  function select(card: Card, on: boolean) {
+    if (phase.value !== 'arranging')
+      return
+    if (update(setCardSelected(board.value, card, on)))
+      sound.play('select')
+  }
+
+  /** 整道向头道（+1）或尾道（−1）移动；两道有牌时整体互换 */
+  function move(lane: Lane, dir: -1 | 1) {
+    if (phase.value !== 'arranging')
+      return
+    if (update(moveLane(board.value, lane, dir)))
+      sound.play('place')
+  }
+
   function place(lane: Lane) {
     if (phase.value !== 'arranging')
       return
@@ -136,7 +152,6 @@ export const usePracticeStore = defineStore('practice', () => {
       const r = await evaluateInWorker({
         hand: [...b.hand],
         player: [[...b.lanes[0]], [...b.lanes[1]], [...b.lanes[2]]],
-        lambda: settings.lambda,
         samples: SAMPLES,
         seed,
       })
@@ -195,6 +210,8 @@ export const usePracticeStore = defineStore('practice', () => {
     startReview,
     retry,
     toggle,
+    select,
+    move,
     place,
     unplace,
     clear,

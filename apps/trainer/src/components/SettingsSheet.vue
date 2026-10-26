@@ -1,18 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 
 const open = defineModel<boolean>('open', { required: true })
 
 const settings = useSettingsStore()
-const { lambda, soundEnabled, volume, vibrate } = storeToRefs(settings)
-
-const lambdaHint = computed(() => {
-  if (lambda.value === 0)
-    return '只看平均得分，不考虑波动。'
-  return `标准差每高 10 分，折合扣 ${(lambda.value * 10).toFixed(1)} 分平均得分。`
-})
+const { soundEnabled, volume, vibrate } = storeToRefs(settings)
 </script>
 
 <template>
@@ -26,15 +19,6 @@ const lambdaHint = computed(() => {
           完成
         </button>
       </header>
-
-      <label class="field">
-        <span class="k">风险系数 λ <span class="num">{{ lambda.toFixed(2) }}</span></span>
-        <input v-model.number="lambda" type="range" min="0" max="1" step="0.05">
-        <span class="hint">
-          推荐摆法按「平均得分 − λ × 标准差」比较，λ 越大越偏向稳。{{ lambdaHint }}
-          与最优相差在抽样误差内的摆法都算最优，其中推荐标准差最小的一个。
-        </span>
-      </label>
 
       <label class="field row">
         <span class="k">音效</span>

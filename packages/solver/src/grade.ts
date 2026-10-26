@@ -3,8 +3,8 @@ import type { Recommendation, ScoredArrangement } from './recommend'
 /**
  * 玩家摆法的评级：
  * - best    与最优在抽样误差内无法区分（equivalentBest）
- * - minor   次优：效用差距 < MINOR_GAP
- * - mistake 明显失误：效用差距 ≥ MINOR_GAP
+ * - minor   次优：平均得分差距 < MINOR_GAP
+ * - mistake 明显失误：平均得分差距 ≥ MINOR_GAP
  * - foul    倒水（三道全部垫底）
  */
 export type Verdict = 'best' | 'minor' | 'mistake' | 'foul'
@@ -26,9 +26,9 @@ export interface Grade {
   verdict: Verdict
   player: ScoredArrangement
   best: ScoredArrangement
-  /** 玩家摆法相对推荐摆法损失的期望（分），不含风险项 */
+  /** 玩家摆法相对推荐摆法损失的平均得分（分） */
   evLoss: number
-  /** 玩家摆法与效用最高者的差距 */
+  /** 玩家摆法与平均得分最高者的差距 */
   gap: number
 }
 

@@ -64,7 +64,6 @@ export const useRecordsStore = defineStore('records', () => {
       gap: result.gap,
       playerMean: result.player.mean,
       bestMean: result.best.mean,
-      lambda: result.lambda,
       tags: result.tags.map(x => x.code),
     }
     try {

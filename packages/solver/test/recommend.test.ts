@@ -38,11 +38,21 @@ describe('推荐', () => {
     expect(naive.equivalentBest).toBe(false)
     expect(naive.gap).toBeGreaterThan(25)
     expect(naive.tableRank).toBeGreaterThan(1)
-    // ranked 按效用降序，效用 = 均值 − λ·标准差（默认 λ = 0.1）
+    // ranked 按平均得分降序，同分时标准差小者在前
     for (let i = 1; i < r.ranked.length; i++)
-      expect(r.ranked[i - 1].utility).toBeGreaterThanOrEqual(r.ranked[i].utility)
+      expect(r.ranked[i - 1].stat.mean).toBeGreaterThanOrEqual(r.ranked[i].stat.mean)
+    expect(r.best).toBe(r.ranked[0])
+  })
+
+  it('推荐取平均得分最高者，稳定性不能让它低于玩家摆法', () => {
+    const hand = parseCards('3♦ 5♣ 6♣ 6♦ 7♦ 10♦ Q♠ Q♦ A♣')
+    // 这手牌中平均得分最高的摆法标准差较大；旧逻辑会改推标准差更小的低分摆法
+    const highMean = arr('3♦ 7♦ 10♦ | 5♣ Q♠ Q♦ | 6♣ 6♦ A♣')
+    const r = recommend(hand, model, { samples: 300, seed: 90, extra: [highMean] })
+    expect(r.best.stat.mean).toBeGreaterThanOrEqual(r.extra[0].stat.mean)
     for (const s of r.ranked)
-      expect(s.utility).toBeCloseTo(s.stat.mean - 0.1 * s.stat.std, 10)
+      expect(s.stat.mean).toBeLessThanOrEqual(r.best.stat.mean)
+    expect(r.best.gap).toBe(0)
   })
 
   it('玩家倒水的摆法也能评估', () => {

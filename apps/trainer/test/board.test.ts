@@ -7,9 +7,11 @@ import {
   foulCheck,
   isComplete,
   laneInfo,
+  moveLane,
   placeSelected,
   poolCards,
   removeFromLane,
+  setCardSelected,
   sortCards,
   toArrangement,
   toggleSelect,
@@ -48,6 +50,41 @@ describe('手牌区', () => {
 })
 
 describe('放入与撤回', () => {
+  it('滑动多选：直接设定选中状态，重复设置不产生新对象', () => {
+    const b = createBoard(HAND)
+    const one = setCardSelected(b, c('5♦'), true)
+    expect(one.selected).toEqual([c('5♦')])
+    expect(setCardSelected(one, c('5♦'), true)).toBe(one)
+    expect(setCardSelected(one, c('5♦'), false).selected).toEqual([])
+    // 已放入某一道的牌不能被滑选
+    const placed = put(b, Lane.Head, 'A♥ 10♥ 8♥')
+    expect(setCardSelected(placed, c('A♥'), true)).toBe(placed)
+  })
+
+  it('整道移动：相邻两道整体互换，边界与空道不操作', () => {
+    let b = createBoard(HAND)
+    b = put(b, Lane.Tail, 'A♥ A♣ A♦')
+    b = put(b, Lane.Middle, 'Q♣ Q♦ K♣')
+    b = put(b, Lane.Head, '10♥ 8♥ 5♦')
+
+    const up = moveLane(b, Lane.Tail, 1)
+    expect(up.lanes[Lane.Tail]).toEqual(parseCards('Q♣ Q♦ K♣'))
+    expect(up.lanes[Lane.Middle]).toEqual(parseCards('A♥ A♣ A♦'))
+    expect(up.lanes[Lane.Head]).toEqual(parseCards('10♥ 8♥ 5♦'))
+
+    const down = moveLane(b, Lane.Head, -1)
+    expect(down.lanes[Lane.Head]).toEqual(parseCards('Q♣ Q♦ K♣'))
+    expect(down.lanes[Lane.Middle]).toEqual(parseCards('10♥ 8♥ 5♦'))
+
+    expect(moveLane(b, Lane.Head, 1)).toBe(b)
+    expect(moveLane(b, Lane.Tail, -1)).toBe(b)
+    // 目标道为空时整组搬过去
+    const tailOnly = put(createBoard(HAND), Lane.Tail, 'A♥ A♣ A♦')
+    const moved = moveLane(tailOnly, Lane.Tail, 1)
+    expect(moved.lanes[Lane.Tail]).toEqual([])
+    expect(moved.lanes[Lane.Middle]).toEqual(parseCards('A♥ A♣ A♦'))
+  })
+
   it('一道最多 3 张，放不下的牌保持选中', () => {
     let b = createBoard(HAND)
     for (const card of parseCards('A♥ A♣ A♦ K♣'))

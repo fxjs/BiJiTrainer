@@ -5,7 +5,7 @@
 ## 结构
 
 - `packages/core`：规则引擎（牌编码、牌型强度、摆法与倒水、喜牌、结算）
-- `packages/solver`：胜率表模型、摆牌策略、蒙特卡洛精排、推荐（U = EV − λ·σ）
+- `packages/solver`：胜率表模型、摆牌策略、蒙特卡洛精排、推荐（平均得分最高）
 - `packages/solver/data`：自博弈训练的胜率表与训练统计
 - `packages/audio`：音效（Web Audio 实时合成）
 - `apps/trainer`：训练 H5（Vite + Vue 3 + Pinia + UnoCSS），求解在 Web Worker 中运行

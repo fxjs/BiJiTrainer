@@ -86,7 +86,7 @@ const summary = computed(() => {
 
     <p class="foot">
       模拟 {{ result.samples }} 局：其余 45 张随机发给 5 名对手，对手按胜率表摆牌。
-      大数为平均得分（分／手），效用 = 平均 − {{ result.lambda }} × σ。用时 {{ result.elapsedMs }} ms。
+      大数为平均得分（分／手），推荐摆法取平均得分最高者。用时 {{ result.elapsedMs }} ms。
     </p>
 
     <div class="actions">

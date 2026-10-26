@@ -9,17 +9,10 @@ import { patternArrangement, rankPatterns, tableValue, viewHand } from './policy
 /** 自己成一个喜，其余 5 家各付 5 分 */
 const XI_BONUS = XI_PAY_PER_PLAYER * OPPONENTS
 
-/**
- * 默认风险系数。探测讲义牌例时，各摆法得分标准差在 2~23 分之间；
- * λ = 0.1 意为标准差每高 10 分折合 1 分期望，只在期望接近时偏向稳，不推翻明显的期望差距。
- */
-export const DEFAULT_LAMBDA = 0.1
 /** 默认等价最优阈值（分） */
 export const DEFAULT_EPSILON = 0.5
 
 export interface RecommendOptions extends MonteCarloOptions {
-  /** 风险系数 λ：效用 U = 均值 − λ·标准差；0 为纯期望，越大越偏向稳。默认 DEFAULT_LAMBDA */
-  lambda?: number
   /** 等价最优阈值 ε（分），默认 DEFAULT_EPSILON。实际门槛取 max(ε, 2 × 与最优之差的配对标准误) */
   epsilon?: number
   /** 粗排后进入蒙特卡洛精排的候选数，默认 10 */
@@ -37,19 +30,18 @@ export interface ScoredArrangement {
   /** 在全部合法摆法中按表估值的名次（1 起）；倒水为 null */
   tableRank: number | null
   stat: MonteCarloStat
-  utility: number
-  /** 与效用最高者之差 */
+  /** 与平均得分最高者之差 */
   gap: number
-  /** 该差值中均值部分的配对标准误 */
+  /** 该差值的配对标准误 */
   gapStderr: number
   /** gap ≤ max(ε, 2·gapStderr)，即在抽样误差内与最优无法区分 */
   equivalentBest: boolean
 }
 
 export interface Recommendation {
-  /** 精排过的摆法，按效用降序 */
+  /** 精排过的摆法，按平均得分降序；同分时标准差小者在前 */
   ranked: ScoredArrangement[]
-  /** 推荐摆法：等价最优中标准差最小者 */
+  /** 推荐摆法：平均得分最高者；同分时标准差较小者 */
   best: ScoredArrangement
   /** 与 options.extra 一一对应 */
   extra: ScoredArrangement[]
@@ -63,7 +55,6 @@ export function arrangementKey(arr: Arrangement): string {
 }
 
 export function recommend(hand: readonly Card[], model: LaneModel, opts: RecommendOptions = {}): Recommendation {
-  const lambda = opts.lambda ?? DEFAULT_LAMBDA
   const epsilon = opts.epsilon ?? DEFAULT_EPSILON
   const topK = opts.topK ?? 10
   const view = viewHand(hand)
@@ -101,21 +92,20 @@ export function recommend(hand: readonly Card[], model: LaneModel, opts: Recomme
         : tableValue(model, strengths[0], strengths[1], strengths[2]) + XI_BONUS * arrangementXi(arrangement).length,
       tableRank: rankByKey.get(keys[i]) ?? null,
       stat: stats[i],
-      utility: stats[i].mean - lambda * stats[i].std,
       gap: 0,
       gapStderr: 0,
       equivalentBest: false,
     }
   })
-  const ranked = [...scored].sort((a, b) => b.utility - a.utility)
+  // 推荐必须取期望得分最高者；稳定性只用作同分时的次序，不能反过来降低期望
+  const ranked = [...scored].sort((a, b) => b.stat.mean - a.stat.mean || a.stat.std - b.stat.std)
   const top = ranked[0]
   for (const s of scored) {
-    s.gap = top.utility - s.utility
+    s.gap = top.stat.mean - s.stat.mean
     s.gapStderr = s === top ? 0 : pairedStderr(top.stat, s.stat)
     s.equivalentBest = s.gap <= Math.max(epsilon, 2 * s.gapStderr)
   }
-  // 抽样误差内无法区分时，推荐更稳的那个
-  const best = ranked.filter(s => s.equivalentBest).reduce((a, b) => (b.stat.std < a.stat.std ? b : a))
+  const best = top
 
   const byKey = new Map(keys.map((k, i) => [k, scored[i]]))
   return {

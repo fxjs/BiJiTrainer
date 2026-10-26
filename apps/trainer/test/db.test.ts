@@ -16,7 +16,6 @@ const record: PracticeRecord = {
   gap: 5,
   playerMean: 1,
   bestMean: 6,
-  lambda: 0.1,
   tags: ['headWasted'],
 }
 

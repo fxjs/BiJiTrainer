@@ -72,7 +72,6 @@ describe('统计', () => {
     gap: evLoss,
     playerMean: 0,
     bestMean: 0,
-    lambda: 0.1,
     tags,
   })
 

@@ -7,7 +7,6 @@ export interface EvaluateRequest {
   hand: Card[]
   /** 玩家摆法，顺序 尾、中、头 */
   player: [Card[], Card[], Card[]]
-  lambda: number
   samples: number
   seed: number
 }
@@ -25,7 +24,6 @@ export interface ScoredDTO {
   /** 各道拿第一的频率：尾、中、头 */
   laneFirst: [number, number, number]
   sweep: number
-  utility: number
   gap: number
   tableRank: number | null
   equivalentBest: boolean
@@ -37,13 +35,12 @@ export interface GradeDTO {
   gap: number
   player: ScoredDTO
   best: ScoredDTO
-  /** 推荐摆法之外、效用最高的若干摆法 */
+  /** 推荐摆法之外、平均得分最高的若干摆法 */
   alternatives: ScoredDTO[]
   /** 错因诊断；评级为最优时为空 */
   tags: Tag[]
   legalCount: number
   samples: number
-  lambda: number
   elapsedMs: number
 }
 

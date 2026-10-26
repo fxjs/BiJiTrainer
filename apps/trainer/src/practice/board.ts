@@ -42,12 +42,40 @@ export function sortCards(cards: readonly Card[], mode: SortMode): Card[] {
 }
 
 export function toggleSelect(b: Board, card: Card): Board {
+  return setCardSelected(b, card, !b.selected.includes(card))
+}
+
+/** 把一张手牌设为选中/未选中；已放入某一道或不在手牌中的牌忽略 */
+export function setCardSelected(b: Board, card: Card, selected: boolean): Board {
   if (placedSet(b).has(card) || !b.hand.includes(card))
     return b
-  const selected = b.selected.includes(card)
-    ? b.selected.filter(c => c !== card)
-    : [...b.selected, card]
-  return { ...b, selected }
+  if (b.selected.includes(card) === selected)
+    return b
+  return {
+    ...b,
+    selected: selected ? [...b.selected, card] : b.selected.filter(c => c !== card),
+  }
+}
+
+/** 整道移动方向：+1 向头道（显示为上），−1 向尾道（显示为下） */
+export type LaneMove = -1 | 1
+
+/**
+ * 把一整道的牌移动到相邻道：两道已有牌时整体互换，目标道为空时整组搬过去。
+ * 显式允许在摆牌过程中使用，便于倒水时直接换道而不必逐张撤回。
+ */
+export function moveLane(b: Board, lane: Lane, dir: LaneMove): Board {
+  const target = lane + dir
+  if (target < 0 || target > 2 || b.lanes[lane].length === 0)
+    return b
+  const lanes = b.lanes.map((cards, i) => {
+    if (i === lane)
+      return b.lanes[target]
+    if (i === target)
+      return b.lanes[lane]
+    return cards
+  }) as unknown as Board['lanes']
+  return { ...b, lanes }
 }
 
 /** 把选中的牌放入某一道；放不下的部分保持选中 */

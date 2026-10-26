@@ -13,7 +13,6 @@ export interface PracticeRecord {
   gap: number
   playerMean: number
   bestMean: number
-  lambda: number
   tags: TagCode[]
 }
 

@@ -27,7 +27,6 @@ function toDTO(s: ScoredArrangement): ScoredDTO {
     stderr: s.stat.stderr,
     laneFirst: s.stat.laneFirst,
     sweep: s.stat.sweep,
-    utility: s.utility,
     gap: s.gap,
     tableRank: s.tableRank,
     equivalentBest: s.equivalentBest,
@@ -42,7 +41,6 @@ scope.onmessage = (e) => {
     const [t, m, h] = req.player.map(l => [l[0], l[1], l[2]] as Triple)
     const player: Arrangement = { lanes: [t, m, h] }
     const rec = recommend(req.hand, defaultModel(), {
-      lambda: req.lambda,
       samples: req.samples,
       seed: req.seed,
       extra: [player],
@@ -75,7 +73,6 @@ scope.onmessage = (e) => {
         tags,
         legalCount: rec.legalCount,
         samples: req.samples,
-        lambda: req.lambda,
         elapsedMs: Math.round(performance.now() - t0),
       },
     }
