@@ -273,7 +273,10 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 .status {
   margin: 2px 10px 4px;
+  /* 选中前后提示文字长短不同；固定两行高度，避免底部页面因内容变矮而回弹 */
+  min-height: 2.8em;
   font-size: 13px;
+  line-height: 1.4;
   color: var(--table-muted);
 }
 
