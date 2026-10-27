@@ -57,7 +57,7 @@ function onRowClick() {
       >
         {{ name }}
       </button>
-      <span class="label">{{ label ?? `${cards.length} / 3` }}</span>
+      <span class="label" :title="label ?? undefined">{{ label ?? `${cards.length} / 3` }}</span>
       <span v-if="foul" class="foul-label">倒水</span>
     </div>
     <div class="slots">
@@ -100,13 +100,12 @@ function onRowClick() {
 
 <style scoped>
 .lane {
-  --lane-card-width: 58px;
   position: relative;
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) 44px;
+  grid-template-columns: 44px minmax(0, 1fr) 88px;
   align-items: center;
-  gap: 12px;
-  padding: 8px;
+  gap: 4px;
+  padding: 2px 0;
   border: 1px solid transparent;
   border-radius: 8px;
 }
@@ -125,17 +124,18 @@ function onRowClick() {
   align-content: center;
   justify-items: start;
   min-width: 0;
-  gap: 3px;
+  gap: 0;
 }
 
 .place-target {
+  min-width: 44px;
   min-height: 44px;
-  margin: -8px 0 -4px;
+  margin: -6px 0;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--table-ink);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -153,9 +153,13 @@ function onRowClick() {
 
 .label {
   color: var(--table-muted);
-  font-size: 12px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.25;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
 
@@ -169,20 +173,20 @@ function onRowClick() {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
 .move {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  gap: 0;
 }
 
 .move-btn {
   display: grid;
   place-items: center;
   width: 44px;
-  height: 40px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--rule);
   border-radius: 6px;
@@ -208,7 +212,7 @@ function onRowClick() {
   flex: none;
   place-items: center;
   width: var(--lane-card-width);
-  height: calc(var(--lane-card-width) * 1.4);
+  height: calc(var(--lane-card-width) * var(--card-aspect, 1.4));
   border: 1px dashed var(--rule);
   border-radius: 6px;
   color: var(--table-muted);
@@ -233,21 +237,17 @@ function onRowClick() {
   }
 }
 
-@media (max-width: 540px) {
-  .lane {
-    --lane-card-width: min(52px, 12vw);
-    grid-template-columns: 48px minmax(0, 1fr) 44px;
-    gap: 6px;
-    padding: 2px 6px;
-  }
+@media (max-height: 740px) {
+  .lane { padding-block: 0; }
+}
 
-  .slots {
-    gap: 4px;
-  }
+@media (min-width: 700px) and (min-height: 501px) {
+  .lane { grid-template-columns: 100px minmax(0, 1fr) 88px; }
+}
 
-  .place-target {
-    font-size: 15px;
-  }
+@media (max-width: 559px) and (max-height: 500px) {
+  /* The foul verdict replaces rank details already visible on the cards. */
+  .lane.foul .label { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

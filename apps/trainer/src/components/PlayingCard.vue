@@ -50,7 +50,7 @@ const aria = computed(() => (joker.value ? (props.card === BIG_JOKER ? '大王' 
   display: inline-block;
   flex: none;
   width: var(--w);
-  height: calc(var(--w) * 1.4);
+  height: calc(var(--w) * var(--card-aspect, 1.4));
   padding: 0;
   border: 1px solid var(--card-edge);
   border-radius: 6px;
@@ -87,7 +87,7 @@ const aria = computed(() => (joker.value ? (props.card === BIG_JOKER ? '大王' 
   position: absolute;
   top: .18em;
   left: .18em;
-  font-size: calc(var(--w) * .4);
+  font-size: calc(var(--w) * var(--card-rank-scale, .4));
   font-weight: 800;
   letter-spacing: -.035em;
 }
@@ -97,7 +97,7 @@ const aria = computed(() => (joker.value ? (props.card === BIG_JOKER ? '大王' 
   right: .15em;
   bottom: .12em;
   font-family: var(--serif);
-  font-size: calc(var(--w) * .54);
+  font-size: calc(var(--w) * var(--card-suit-scale, .54));
   font-style: normal;
 }
 

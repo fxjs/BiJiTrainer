@@ -49,7 +49,7 @@ const hint = computed(() => {
     return `已选 ${selected.value.length} 张，点某一道放入`
   if (complete.value)
     return foul.value.any ? '可以提交，但会按倒水结算；可用 ↑↓ 整道换位' : '三道已摆满，可以提交'
-  return '点选手牌，再点某一道放入；横向滑过多张可连续选择；点道内的牌撤回'
+  return '选牌后点一道放入；点道内的牌撤回'
 })
 
 /** 倒水时整道换位：+1 向头道，−1 向尾道 */
@@ -167,12 +167,8 @@ function onCardClick(e: MouseEvent, card: Card) {
 </script>
 
 <template>
-  <div class="practice">
+  <div class="practice" :class="{ 'showing-result': phase === 'result' }">
     <template v-if="phase !== 'result'">
-      <p v-if="source.kind === 'review'" class="review-note">
-        错题复习 · 花色已做同色置换
-      </p>
-
       <section class="table" aria-label="摆牌桌面" :aria-busy="phase === 'evaluating'">
         <header class="table-heading">
           <h2>摆好三道</h2>
@@ -196,13 +192,14 @@ function onCardClick(e: MouseEvent, card: Card) {
           />
         </div>
         <p id="practice-status" class="status" :class="{ bad: foul.any }" aria-live="polite">
+          <span v-if="source.kind === 'review'" class="review-note">复习 · 同色置换 · </span>
           {{ phase === 'evaluating' ? '正在模拟对局，分析这手牌…' : foulText || hint }}
         </p>
       </section>
 
       <section class="hand" aria-label="待摆手牌">
         <div class="hand-heading">
-          <h3>手牌 <span>{{ pool.length }} 张</span></h3>
+          <h3>{{ source.kind === 'review' ? '复习手牌' : '手牌' }} <span>{{ pool.length }} 张</span></h3>
           <span class="selection-count" :class="{ active: selected.length > 0 }">
             {{ selected.length > 0 ? `已选 ${selected.length} 张` : '点选或横滑多选' }}
           </span>
@@ -273,20 +270,24 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 <style scoped>
 .practice {
-  display: grid;
+  --lane-card-width: clamp(44px, min(6.5dvh, calc((100vw - 196px) / 3)), 58px);
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  gap: 20px;
+  min-height: 0;
+  gap: 12px;
 }
 
 .review-note {
-  margin: 0;
   color: var(--gold);
-  font-size: 13px;
 }
 
 .table {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
-  padding: 16px;
+  padding: 12px;
   background: var(--table);
   border-radius: 12px;
   color: var(--table-ink);
@@ -301,7 +302,7 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .table-heading {
-  margin: 0 8px 12px;
+  margin: 0 4px 8px;
 }
 
 .table-heading h2,
@@ -318,17 +319,18 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 .lanes {
   display: grid;
+  align-content: space-evenly;
   gap: 4px;
 }
 
 .status {
-  margin: 12px 8px 0;
-  padding-top: 12px;
+  margin: 8px 4px 0;
+  padding-top: 4px;
   border-top: 1px solid var(--rule);
-  /* Reserve two lines so selecting cards does not move the hand underneath. */
-  min-height: calc(2.8em + 13px);
+  /* Two stable lines keep the hand in place through selection and foul feedback. */
+  min-height: calc(2.8em + 5px);
   color: var(--table-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.4;
   text-wrap: pretty;
 }
@@ -338,11 +340,13 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .hand {
+  flex: none;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .hand-heading {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .hand-heading h3 span {
@@ -363,14 +367,17 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .pool {
-  --hand-card-width: 56px;
+  --hand-card-width: clamp(44px, 7dvh, 56px);
+  --hand-card-height: calc(var(--hand-card-width) * var(--card-aspect, 1.4));
   display: grid;
   grid-template-columns: repeat(9, var(--hand-card-width));
+  grid-auto-rows: var(--hand-card-height);
   justify-content: center;
-  gap: 12px 8px;
-  min-height: 96px;
-  padding: 10px 0 4px;
-  /* Horizontal gestures select cards; vertical gestures still scroll the page. */
+  align-content: start;
+  gap: 8px;
+  min-height: calc(var(--hand-card-height) + 12px);
+  padding: 10px 0 2px;
+  /* Horizontal gestures select cards; vertical gestures remain native. */
   touch-action: pan-y;
   user-select: none;
 }
@@ -387,10 +394,10 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .bar {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding-top: 4px;
 }
 
 .bar .btn {
@@ -408,33 +415,19 @@ function onCardClick(e: MouseEvent, card: Card) {
   font-size: 13px;
 }
 
-@media (max-width: 680px) {
+@container (max-width: 600px) {
   .pool {
-    --hand-card-width: min(48px, calc((100vw - 64px) / 5));
+    --hand-card-width: clamp(44px, min(7dvh, calc((100cqw - 16px) / 5)), 56px);
     grid-template-columns: repeat(5, var(--hand-card-width));
-    min-height: calc(var(--hand-card-width) * 2.8 + 26px);
-    column-gap: 6px;
+    column-gap: 4px;
+    min-height: calc(var(--hand-card-height) * 2 + 20px);
   }
 }
 
-@media (max-width: 420px) {
-  .practice {
-    gap: 12px;
-  }
-
-  .table {
-    padding: 8px;
-  }
-
-  .table-heading {
-    margin-inline: 6px;
-    margin-bottom: 6px;
-    gap: 8px;
-  }
-
+@media (max-width: 600px), (max-height: 500px) {
   .bar {
     display: grid;
-    grid-template-columns: 1.1fr .7fr 1fr 1.25fr;
+    grid-template-columns: minmax(60px, 1.1fr) minmax(44px, .7fr) minmax(50px, 1fr) minmax(60px, 1.25fr);
     gap: 6px;
   }
 
@@ -444,16 +437,46 @@ function onCardClick(e: MouseEvent, card: Card) {
   }
 
   .bar .btn {
-    padding: 8px 5px;
+    padding: 8px 4px;
     font-size: 12px;
     white-space: nowrap;
   }
 
-  .status {
-    margin-top: 6px;
-    padding-top: 8px;
-    min-height: calc(2.8em + 9px);
-    font-size: 12px;
+}
+
+@media (max-height: 740px) {
+  .practice { --lane-card-width: 44px; gap: 8px; }
+  .table { padding: 6px; grid-template-rows: minmax(0, 1fr) auto; }
+  .table-heading { display: none; }
+  .status { margin: 4px 0 0; }
+  .hand-heading h3 { font-size: 14px; }
+}
+
+@media (min-width: 560px) and (max-height: 500px) {
+  .practice {
+    display: grid;
+    grid-template-columns: minmax(294px, 1.15fr) minmax(236px, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: 'table hand' 'table actions';
+  }
+  .table { grid-area: table; }
+  .hand { grid-area: hand; align-self: end; }
+  .bar { grid-area: actions; }
+  .error { grid-column: 1 / -1; }
+}
+
+@media (max-width: 559px) and (max-height: 550px) {
+  .practice:not(.showing-result) { --card-aspect: 1.15; }
+  .hand-heading { display: none; }
+}
+
+@media (max-width: 559px) and (max-height: 500px) {
+  .practice:not(.showing-result) {
+    --card-aspect: 1;
+    --card-rank-scale: .36;
+    --card-suit-scale: .44;
   }
 }
+
+.practice.showing-result { display: flex; }
 </style>

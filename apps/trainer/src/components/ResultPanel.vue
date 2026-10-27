@@ -44,50 +44,54 @@ const summary = computed(() => {
       <p>{{ summary }}</p>
     </header>
 
-    <p v-if="sourceNote" class="source">
-      {{ sourceNote }}
-    </p>
+    <div class="result-details" role="region" aria-label="本手复盘详情" tabindex="0">
+      <p v-if="sourceNote" class="source">
+        {{ sourceNote }}
+      </p>
 
-    <ul v-if="result.tags.length" class="tags" aria-label="本手复盘要点">
-      <li v-for="t in result.tags" :key="t.code">
-        <strong>{{ t.title }}</strong>
-        <span>{{ t.detail }}</span>
-      </li>
-    </ul>
-
-    <div class="comparison">
-      <ArrangementView
-        title="你的摆法"
-        :s="result.player"
-        :legal-count="result.legalCount"
-        :highlight="sameAsBest"
-      />
-      <ArrangementView
-        v-if="!sameAsBest"
-        title="推荐摆法"
-        :s="result.best"
-        :legal-count="result.legalCount"
-        highlight
-      />
-    </div>
-
-    <details v-if="result.alternatives.length" class="alts" @toggle="showAlternatives = ($event.target as HTMLDetailsElement).open">
-      <summary>其他 {{ result.alternatives.length }} 个候选摆法</summary>
-      <div v-if="showAlternatives" class="alternative-list">
+      <div class="comparison">
         <ArrangementView
-          v-for="(a, i) in result.alternatives"
-          :key="i"
-          :title="`候选 ${i + 1}（差 ${signed(-a.gap)}）`"
-          :s="a"
+          title="你的摆法"
+          :s="result.player"
           :legal-count="result.legalCount"
+          :highlight="sameAsBest"
+        />
+        <ArrangementView
+          v-if="!sameAsBest"
+          title="推荐摆法"
+          :s="result.best"
+          :legal-count="result.legalCount"
+          highlight
         />
       </div>
-    </details>
 
-    <p class="foot">
-      模拟 {{ result.samples }} 局：其余 45 张随机发给 5 名对手，对手按胜率表摆牌。
-      平均得分单位为分／手，推荐摆法取平均得分最高者。用时 {{ result.elapsedMs }} ms。
-    </p>
+      <details v-if="result.alternatives.length" class="alts" @toggle="showAlternatives = ($event.target as HTMLDetailsElement).open">
+        <summary>其他 {{ result.alternatives.length }} 个候选摆法</summary>
+        <div v-if="showAlternatives" class="alternative-list">
+          <ArrangementView
+            v-for="(a, i) in result.alternatives"
+            :key="i"
+            :title="`候选 ${i + 1}（差 ${signed(-a.gap)}）`"
+            :s="a"
+            :legal-count="result.legalCount"
+          />
+        </div>
+      </details>
+
+      <details class="alts review-notes">
+        <summary>复盘要点与模拟说明</summary>
+        <ul v-if="result.tags.length" class="tags" aria-label="本手复盘要点">
+          <li v-for="t in result.tags" :key="t.code">
+            <strong>{{ t.title }}</strong>
+            <span>{{ t.detail }}</span>
+          </li>
+        </ul>
+        <p class="foot">
+          模拟 {{ result.samples }} 局：其余 45 张随机发给 5 名对手，对手按胜率表摆牌。
+          平均得分单位为分／手，推荐摆法取平均得分最高者。用时 {{ result.elapsedMs }} ms。
+        </p>
+      </details>
+    </div>
 
     <div class="actions">
       <button type="button" class="btn" :disabled="blocked" @click="$emit('retry')">
@@ -102,22 +106,39 @@ const summary = computed(() => {
 
 <style scoped>
 .result {
+  flex: 1;
   display: grid;
-  gap: 20px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
   min-width: 0;
+  min-height: 0;
 }
+
+.result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 2px 4px 8px;
+}
+.result-details > * { flex: none; }
+.review-notes .tags { margin-bottom: 12px; }
+.review-notes .foot { padding-bottom: 12px; }
 
 .verdict {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 18px;
-  padding: 18px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--rule);
 }
 
 .verdict strong {
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1.2;
   letter-spacing: -.02em;
 }
@@ -125,8 +146,8 @@ const summary = computed(() => {
 .verdict p {
   margin: 0;
   color: var(--ink);
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .verdict.best { color: var(--v-best); }

@@ -84,7 +84,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app">
+  <div class="app" :class="{ 'training-screen': auth.identity && tab === 'practice' && records.ready && !records.loading }">
     <header class="top">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">♠</span>
@@ -104,13 +104,13 @@ onBeforeUnmount(() => {
           <span class="cloud-dot" aria-hidden="true" />
           {{ cloudStatus }}
         </button>
-        <button type="button" class="btn settings-button" aria-haspopup="dialog" @click="settingsOpen = true">
+        <button type="button" class="btn settings-button" aria-label="设置" aria-haspopup="dialog" @click="settingsOpen = true">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
             <path d="M4 7h16M4 17h16" />
             <circle cx="9" cy="7" r="3" fill="var(--surface)" />
             <circle cx="15" cy="17" r="3" fill="var(--surface)" />
           </svg>
-          设置
+          <span class="settings-label">设置</span>
         </button>
       </div>
     </header>
@@ -182,6 +182,22 @@ onBeforeUnmount(() => {
   gap: 24px;
   min-width: 0;
 }
+.app.training-screen {
+  height: 100dvh;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.training-screen .brand { gap: 8px; }
+.training-screen .brand-mark { flex-basis: 32px; width: 32px; height: 40px; font-size: 26px; }
+.training-screen h1 { font-size: 18px; }
+.training-screen .top-actions { flex-direction: row; gap: 8px; }
+.training-screen .settings-button, .training-screen .cloud-button { min-height: 44px; }
+.training-screen main { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+.training-screen main > :deep(.practice) { flex: 1; min-height: 0; }
+.training-screen .storage-alert { flex: none; margin: 0; padding: 8px 12px; gap: 8px; }
+.training-screen .save-state { flex: none; margin: 0; font-size: 12px; }
+.training-screen .app-footer { display: none; }
 .top, .brand, .top-actions { display: flex; align-items: center; }
 .top { justify-content: space-between; gap: 20px; }
 .brand { gap: 14px; min-width: 0; }
@@ -269,5 +285,27 @@ main { min-width: 0; }
   .tabs button { padding: 9px 5px; font-size: 12px; }
   .badge { margin-left: 1px; min-width: 15px; height: 15px; }
   .app-footer { font-size: 10px; }
+}
+@media (max-height: 740px) {
+  .app.training-screen {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
+  }
+  .training-screen .top { grid-area: 1 / 2; }
+  .training-screen .brand {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .training-screen .cloud-button, .training-screen .settings-label { display: none; }
+  .training-screen .settings-button { width: 44px; padding: 0; justify-content: center; }
+  .training-screen .tabs { grid-area: 1 / 1; padding: 3px; gap: 0; }
+  .training-screen .tabs button { padding: 8px 2px; font-size: 12px; }
+  .training-screen main { grid-area: 2 / 1 / 3 / -1; }
 }
 </style>
