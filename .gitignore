@@ -4,3 +4,8 @@ coverage/
 __pycache__/
 *.log
 .DS_Store
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/

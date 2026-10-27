@@ -17,6 +17,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://kombknykyixfljbffbtj.supabase.co' }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_ZnLxUgUz8tnHMyzwcAcP9Q_vHpK9hR8' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -30,6 +33,13 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test
+
+      - run: pnpm --filter @biji/trainer typecheck
+
+      - name: Check Supabase deployment readiness
+        run: node scripts/deploy/check-backend.mjs
 
       - run: pnpm --filter @biji/trainer build
 

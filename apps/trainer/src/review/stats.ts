@@ -1,6 +1,6 @@
 import type { TagCode, Verdict } from '@biji/solver'
 
-/** 一次自由练习或错题复习的记录，存入 IndexedDB */
+/** 一次自由练习或错题复习的记录，按人物身份存入 Supabase。 */
 export interface PracticeRecord {
   id?: number
   time: number

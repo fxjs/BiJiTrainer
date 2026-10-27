@@ -5,11 +5,13 @@ import { Lane, LANE_NAME } from '@biji/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { usePracticeStore } from '../stores/practice'
+import { useRecordsStore } from '../stores/records'
 import LaneRow from './LaneRow.vue'
 import PlayingCard from './PlayingCard.vue'
 import ResultPanel from './ResultPanel.vue'
 
 const practice = usePracticeStore()
+const records = useRecordsStore()
 const { pool, lanes, foul, complete, selected, phase, result, error, sortMode, source } = storeToRefs(practice)
 
 const arranging = computed(() => phase.value === 'arranging')
@@ -166,56 +168,73 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 <template>
   <div class="practice">
-    <p v-if="source.kind === 'review' && phase !== 'result'" class="review-note">
-      错题复习：花色已做同色置换
-    </p>
-    <div class="table">
-      <LaneRow
-        v-for="l in order"
-        :key="l"
-        :name="LANE_NAME[l]"
-        :cards="lanes[l].cards"
-        :label="lanes[l].info.label"
-        :foul="laneFoul(l)"
-        :droppable="arranging && selected.length > 0 && lanes[l].cards.length < 3"
-        :disabled="!arranging"
-        :can-move-up="arranging && lanes[l].cards.length > 0 && l < Lane.Head"
-        :can-move-down="arranging && lanes[l].cards.length > 0 && l > Lane.Tail"
-        @place="practice.place(l)"
-        @remove="(c) => practice.unplace(l, c)"
-        @move="(dir) => moveLane(l, dir)"
-      />
-      <p class="status" :class="{ bad: foul.any }" aria-live="polite">
-        {{ foulText || hint }}
-      </p>
-    </div>
-
     <template v-if="phase !== 'result'">
-      <div
-        ref="poolEl"
-        class="pool"
-        :class="{ empty: pool.length === 0 }"
-        @pointerdown="onPointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-        @pointercancel="onPointerCancel"
-      >
-        <PlayingCard
-          v-for="c in pool"
-          :key="c"
-          :card="c"
-          :data-card="c"
-          size="md"
-          :selected="selected.includes(c)"
-          :interactive="arranging"
-          @click="(e: MouseEvent) => onCardClick(e, c)"
-        />
-      </div>
+      <p v-if="source.kind === 'review'" class="review-note">
+        错题复习 · 花色已做同色置换
+      </p>
+
+      <section class="table" aria-label="摆牌桌面" :aria-busy="phase === 'evaluating'">
+        <header class="table-heading">
+          <h2>摆好三道</h2>
+          <span>尾道 ≥ 中道 ≥ 头道</span>
+        </header>
+        <div class="lanes">
+          <LaneRow
+            v-for="l in order"
+            :key="l"
+            :name="LANE_NAME[l]"
+            :cards="lanes[l].cards"
+            :label="lanes[l].info.label"
+            :foul="laneFoul(l)"
+            :droppable="arranging && selected.length > 0 && lanes[l].cards.length < 3"
+            :disabled="!arranging"
+            :can-move-up="arranging && lanes[l].cards.length > 0 && l < Lane.Head"
+            :can-move-down="arranging && lanes[l].cards.length > 0 && l > Lane.Tail"
+            @place="practice.place(l)"
+            @remove="(c) => practice.unplace(l, c)"
+            @move="(dir) => moveLane(l, dir)"
+          />
+        </div>
+        <p id="practice-status" class="status" :class="{ bad: foul.any }" aria-live="polite">
+          {{ phase === 'evaluating' ? '正在模拟对局，分析这手牌…' : foulText || hint }}
+        </p>
+      </section>
+
+      <section class="hand" aria-label="待摆手牌">
+        <div class="hand-heading">
+          <h3>手牌 <span>{{ pool.length }} 张</span></h3>
+          <span class="selection-count" :class="{ active: selected.length > 0 }">
+            {{ selected.length > 0 ? `已选 ${selected.length} 张` : '点选或横滑多选' }}
+          </span>
+        </div>
+        <div
+          ref="poolEl"
+          class="pool"
+          :class="{ empty: pool.length === 0 }"
+          aria-describedby="practice-status"
+          @pointerdown="onPointerDown"
+          @pointermove="onPointerMove"
+          @pointerup="onPointerUp"
+          @pointercancel="onPointerCancel"
+        >
+          <PlayingCard
+            v-for="c in pool"
+            :key="c"
+            :card="c"
+            :data-card="c"
+            size="md"
+            :selected="selected.includes(c)"
+            :interactive="arranging"
+            @click="(e: MouseEvent) => onCardClick(e, c)"
+          />
+          <p v-if="pool.length === 0" class="pool-empty">手牌已全部摆入三道</p>
+        </div>
+      </section>
 
       <div class="bar">
         <button
           type="button"
-          class="btn"
+          class="btn sort"
           :disabled="!arranging"
           @click="toggleSort"
         >
@@ -233,7 +252,7 @@ function onCardClick(e: MouseEvent, card: Card) {
           :disabled="!arranging || !complete"
           @click="practice.submit()"
         >
-          {{ phase === 'evaluating' ? '模拟中…' : '提交' }}
+          {{ phase === 'evaluating' ? '模拟中…' : '提交摆牌' }}
         </button>
       </div>
       <p v-if="error" class="error" role="alert">
@@ -245,6 +264,7 @@ function onCardClick(e: MouseEvent, card: Card) {
       v-else-if="result"
       :result="result"
       :source="source.kind"
+      :blocked="records.saving || records.pendingSave"
       @retry="practice.retry()"
       @next="practice.newHand()"
     />
@@ -254,68 +274,186 @@ function onCardClick(e: MouseEvent, card: Card) {
 <style scoped>
 .practice {
   display: grid;
-  gap: 14px;
+  min-width: 0;
+  gap: 20px;
 }
 
 .review-note {
   margin: 0;
+  color: var(--gold);
   font-size: 13px;
-  color: var(--v-minor);
 }
 
 .table {
+  min-width: 0;
+  padding: 16px;
   background: var(--table);
-  border-radius: 14px;
-  padding: 10px 8px 6px;
+  border-radius: 12px;
+  color: var(--table-ink);
+}
+
+.table-heading,
+.hand-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.table-heading {
+  margin: 0 8px 12px;
+}
+
+.table-heading h2,
+.hand-heading h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.table-heading > span {
+  color: var(--table-muted);
+  font-size: 12px;
+}
+
+.lanes {
   display: grid;
   gap: 4px;
 }
 
 .status {
-  margin: 2px 10px 4px;
-  /* 选中前后提示文字长短不同；固定两行高度，避免底部页面因内容变矮而回弹 */
-  min-height: 2.8em;
+  margin: 12px 8px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  /* Reserve two lines so selecting cards does not move the hand underneath. */
+  min-height: calc(2.8em + 13px);
+  color: var(--table-muted);
   font-size: 13px;
   line-height: 1.4;
-  color: var(--table-muted);
+  text-wrap: pretty;
 }
 
 .status.bad {
-  color: #F0A095;
+  color: var(--red);
+}
+
+.hand {
+  min-width: 0;
+}
+
+.hand-heading {
+  margin-bottom: 8px;
+}
+
+.hand-heading h3 span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.selection-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.selection-count.active {
+  color: var(--gold);
 }
 
 .pool {
-  display: flex;
-  gap: 4px;
+  --hand-card-width: 56px;
+  display: grid;
+  grid-template-columns: repeat(9, var(--hand-card-width));
   justify-content: center;
-  /* 横向滑动用于连续选牌，纵向仍交给页面滚动 */
+  gap: 12px 8px;
+  min-height: 96px;
+  padding: 10px 0 4px;
+  /* Horizontal gestures select cards; vertical gestures still scroll the page. */
   touch-action: pan-y;
-  /* 选中的牌上移 8px，预留空间避免被裁切 */
-  padding-top: 10px;
-  min-height: calc(min(52px, calc((min(100vw, 520px) - 64px) / 9)) * 1.4 + 10px);
+  user-select: none;
 }
 
-.pool.empty::before {
-  content: "手牌已全部摆入三道";
-  align-self: center;
-  font-size: 13px;
+.pool.empty {
+  display: flex;
+  align-items: center;
+}
+
+.pool-empty {
+  margin: 0;
   color: var(--muted);
+  font-size: 13px;
 }
 
 .bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-top: 4px;
+}
+
+.bar .btn {
+  min-height: 44px;
 }
 
 .bar .submit {
   margin-left: auto;
-  min-width: 6em;
+  min-width: 132px;
 }
 
 .error {
   margin: 0;
-  color: var(--v-mistake);
+  color: var(--red);
   font-size: 13px;
+}
+
+@media (max-width: 680px) {
+  .pool {
+    --hand-card-width: min(48px, calc((100vw - 64px) / 5));
+    grid-template-columns: repeat(5, var(--hand-card-width));
+    min-height: calc(var(--hand-card-width) * 2.8 + 26px);
+    column-gap: 6px;
+  }
+}
+
+@media (max-width: 420px) {
+  .practice {
+    gap: 12px;
+  }
+
+  .table {
+    padding: 8px;
+  }
+
+  .table-heading {
+    margin-inline: 6px;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  .bar {
+    display: grid;
+    grid-template-columns: 1.1fr .7fr 1fr 1.25fr;
+    gap: 6px;
+  }
+
+  .bar .submit {
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .bar .btn {
+    padding: 8px 5px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .status {
+    margin-top: 6px;
+    padding-top: 8px;
+    min-height: calc(2.8em + 9px);
+    font-size: 12px;
+  }
 }
 </style>

@@ -26,19 +26,25 @@ const xi = computed(() => props.s.xi.map(x => XI_NAME[x]).join('、'))
   <section class="arr" :class="{ highlight }">
     <header>
       <h3>{{ title }}</h3>
-      <span class="ev num" :title="`标准误 ±${s.stderr.toFixed(2)}`">{{ signed(s.mean) }}</span>
+      <div class="score">
+        <span class="ev num">{{ signed(s.mean) }}</span>
+        <span class="score-label">平均得分／手</span>
+      </div>
     </header>
-    <div v-for="r in rows" :key="r.name" class="row">
-      <span class="pos">{{ r.name }}</span>
-      <span class="cards">
-        <PlayingCard v-for="c in r.cards" :key="c" :card="c" size="sm" />
-      </span>
-      <span class="res">
-        {{ r.label }}<br>
-        第一 <span class="num">{{ pct(r.first) }}</span>
-      </span>
+    <div class="lanes">
+      <div v-for="r in rows" :key="r.name" class="row">
+        <span class="pos">{{ r.name }}</span>
+        <span class="cards">
+          <PlayingCard v-for="c in r.cards" :key="c" :card="c" size="sm" />
+        </span>
+        <span class="res">
+          <strong>{{ r.label }}</strong>
+          <span>第一 <span class="num">{{ pct(r.first) }}</span></span>
+        </span>
+      </div>
     </div>
     <dl class="facts">
+      <div><dt>标准误</dt><dd class="num">±{{ s.stderr.toFixed(2) }}</dd></div>
       <div><dt>波动 σ</dt><dd class="num">{{ s.std.toFixed(1) }}</dd></div>
       <div><dt>通关</dt><dd class="num">{{ pct(s.sweep) }}</dd></div>
       <div><dt>表估值排名</dt><dd class="num">{{ s.tableRank ? `${s.tableRank} / ${legalCount}` : '—' }}</dd></div>
@@ -54,47 +60,69 @@ const xi = computed(() => props.s.xi.map(x => XI_NAME[x]).join('、'))
 
 <style scoped>
 .arr {
+  min-width: 0;
   border: 1px solid var(--rule);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 16px;
   background: var(--surface);
   display: grid;
-  gap: 6px;
+  align-content: start;
+  gap: 16px;
 }
 
 .arr.highlight {
   border-color: var(--felt);
-  background: var(--felt-soft);
+  background: var(--table);
 }
 
 header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: 8px 16px;
 }
 
 h3 {
   margin: 0;
-  font-family: var(--serif);
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.4;
+  text-wrap: balance;
+}
+
+.score {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
 }
 
 .ev {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -.02em;
 }
+
+.highlight .ev { color: var(--felt); }
+
+.score-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lanes { border-top: 1px solid var(--rule); }
 
 .row {
   display: grid;
-  grid-template-columns: 2.6em auto 1fr;
+  grid-template-columns: 2.2em auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  padding-top: 6px;
-  border-top: 1px solid var(--rule);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .pos {
-  font-family: var(--serif);
+  color: var(--muted);
   font-weight: 600;
   font-size: 13px;
 }
@@ -105,42 +133,54 @@ h3 {
 }
 
 .res {
+  display: grid;
+  gap: 3px;
   text-align: right;
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.35;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.res strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 16px;
+  margin: 0;
   font-size: 12px;
-  color: var(--muted);
+  line-height: 1.5;
 }
 
 .facts div {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
 }
 
 .facts dt,
-.facts dd {
-  margin: 0;
-}
-
-.facts dd {
-  color: var(--ink);
-}
+.facts dd { margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { color: var(--ink); }
 
 .note {
   margin: 0;
   font-size: 13px;
+  line-height: 1.6;
   color: var(--felt);
 }
 
-.note.bad {
-  color: var(--v-foul);
+.note.bad { color: var(--v-foul); }
+
+@media (max-width: 380px) {
+  .arr { padding: 12px; }
+  .row { gap: 6px; }
+  .facts { column-gap: 10px; }
 }
 </style>

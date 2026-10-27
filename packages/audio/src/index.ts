@@ -1,239 +1,293 @@
 /**
- * 比鸡音效。全部用 Web Audio 实时合成，不依赖音频文件：
- * - 牌面类声音（发牌、落牌）用带通滤波的白噪声短脉冲模拟
- * - 提示类声音用振荡器合成音阶
- * 训练与后续的对战游戏共用。
+ * 触感音效：纸牌瞬态与柔和音阶，首次使用时合成并缓存 PCM。
+ * 高频操作只创建一次性播放节点，不下载素材、不启动 JS 音频循环。
  */
-
 export type SoundName =
-  | 'deal' // 发牌：洗牌声 + 9 次短促的发牌声
-  | 'select' // 选中手牌
-  | 'place' // 放入某一道
-  | 'unplace' // 从某一道撤回
-  | 'ready' // 三道摆满且合法
-  | 'foulWarn' // 三道摆满但倒水
-  | 'best' // 评级：最优（可带连击数升调）
-  | 'minor' // 评级：次优
-  | 'mistake' // 评级：明显失误
-  | 'foul' // 评级：倒水
-  | 'xi' // 成喜 / 通关
-  | 'tick' // 限时模式倒计时
+  | 'deal' | 'select' | 'deselect' | 'place' | 'unplace'
+  | 'ready' | 'foulWarn' | 'submit'
+  | 'best' | 'minor' | 'mistake' | 'foul' | 'xi' | 'tick' | 'ui'
 
 export interface SoundOptions {
   enabled: boolean
-  /** 总音量 0..1 */
   volume: number
-  /** 是否震动；navigator.vibrate 仅 Android 浏览器支持，iOS Safari 无此 API */
+  /** 震动独立于音效开关；iOS Safari 不支持 navigator.vibrate。 */
   vibrate: boolean
 }
 
 export interface PlayOptions {
-  /** 连续最优次数，best 音效按半音逐级升高，最多升 12 个半音 */
+  /** 连续最优按半音升调，最多一个八度。 */
   streak?: number
+  /** 以音频时钟调度，不用可能跨手触发的 setTimeout。 */
+  delay?: number
+  /** 试听等场景可单独关闭震动。 */
+  haptic?: boolean
 }
 
-/** 各音效的震动模式（毫秒）；未列出的不震动 */
+const DURATION: Record<SoundName, number> = {
+  deal: .43, select: .045, deselect: .05, place: .085, unplace: .08,
+  ready: .23, foulWarn: .28, submit: .1, best: .42, minor: .29,
+  mistake: .4, foul: .28, xi: .68, tick: .04, ui: .05,
+}
 const VIBRATION: Partial<Record<SoundName, number | number[]>> = {
-  place: 8,
-  foulWarn: [30, 40, 30],
-  best: 20,
-  mistake: [15, 30, 15],
-  foul: [40, 40, 40],
-  xi: [20, 30, 20, 30, 60],
+  place: 8, ready: 12, foulWarn: [18, 35, 18], best: 18,
+  mistake: [10, 30, 10], foul: [22, 35, 22], xi: [12, 25, 12, 25, 28],
+}
+const NOTES = [523.25, 659.25, 783.99, 1046.5, 1318.5] as const
+
+/** 带短起音与指数衰减的柔和泛音，变频时积分相位以避免断点。 */
+function mixTone(data: Float32Array, rate: number, at: number, duration: number, frequency: number, gain: number, end = frequency): void {
+  const start = Math.round(at * rate)
+  const length = Math.min(Math.round(duration * rate), data.length - start)
+  for (let i = 0; i < length; i++) {
+    const time = i / rate
+    const envelope = Math.min(1, time / .003) * Math.exp(-6 * time / duration)
+    const phase = 2 * Math.PI * (frequency * time + (end - frequency) * time * time / (2 * duration))
+    data[start + i] += gain * envelope * (Math.sin(phase) + .14 * Math.sin(2 * phase))
+  }
 }
 
-// 音名频率（Hz），用于提示音
-const NOTE = {
-  G3: 196.0,
-  A3: 220.0,
-  C5: 523.25,
-  E5: 659.25,
-  G5: 783.99,
-  A5: 880.0,
-  C6: 1046.5,
-  E6: 1318.5,
-  G4: 392.0,
-  E4: 329.63,
-} as const
-
-type AudioContextCtor = typeof AudioContext
+/** 双低通差分形成柔和纸面频段；固定种子使缓存音色可重复，不依赖素材授权。 */
+function mixPaper(data: Float32Array, rate: number, at: number, duration: number, gain: number, seed: number): void {
+  const start = Math.round(at * rate)
+  const length = Math.min(Math.round(duration * rate), data.length - start)
+  let fast = 0
+  let slow = 0
+  for (let i = 0; i < length; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    const noise = seed / 2147483648 - 1
+    fast += .5 * (noise - fast)
+    slow += .08 * (noise - slow)
+    const time = i / rate
+    const envelope = Math.min(1, time / .001) * Math.exp(-6 * time / duration)
+    data[start + i] += (fast - slow) * gain * envelope
+  }
+}
 
 export class SoundBoard {
-  private opts: SoundOptions
+  private readonly opts: SoundOptions
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
-  private noise: AudioBuffer | null = null
-  private readonly onVisibility = () => this.handleVisibility()
+  private compressor: DynamicsCompressorNode | null = null
+  private readonly samples = new Map<SoundName, AudioBuffer>()
+  private readonly voices = new Map<AudioBufferSourceNode, GainNode>()
+  private lastTap = -Infinity
+  private disposed = false
+  private readonly onVisibility = () => {
+    if (typeof document !== 'undefined' && document.hidden) {
+      this.stop()
+      void this.ctx?.suspend().catch(() => { /* 页面销毁时音频设备可能已关闭。 */ })
+    }
+    // 回到前台只在下一个用户手势恢复，不补播后台或上一手的声音。
+  }
 
   constructor(opts: SoundOptions) {
-    this.opts = { ...opts }
+    this.opts = { ...opts, volume: Math.max(0, Math.min(1, opts.volume)) }
     if (typeof document !== 'undefined')
       document.addEventListener('visibilitychange', this.onVisibility)
   }
 
   setOptions(patch: Partial<SoundOptions>): void {
-    this.opts = { ...this.opts, ...patch }
-    if (this.master && this.ctx)
-      this.master.gain.setValueAtTime(this.opts.volume, this.ctx.currentTime)
+    Object.assign(this.opts, patch)
+    this.opts.volume = Number.isFinite(this.opts.volume) ? Math.max(0, Math.min(1, this.opts.volume)) : 0
+    if (!this.opts.enabled || this.opts.volume === 0) {
+      this.stop()
+      void this.ctx?.suspend().catch(() => { /* 关闭中的音频设备无需再次挂起。 */ })
+    }
+    if (this.master && this.ctx) {
+      const time = this.ctx.currentTime
+      this.master.gain.cancelScheduledValues(time)
+      this.master.gain.setTargetAtTime(this.opts.enabled ? this.opts.volume : 0, time, .012)
+    }
+    if (!this.opts.vibrate && typeof navigator !== 'undefined')
+      navigator.vibrate?.(0)
   }
 
-  /**
-   * 在用户手势（pointerdown / touchend）中调用：iOS Safari 要求 AudioContext
-   * 在用户手势内创建或恢复，否则一直静音。
-   */
+  /** 必须在 pointerdown / keydown 等用户手势中调用，兼容 iOS 音频解锁。 */
   unlock(): void {
+    if (!this.opts.enabled || this.opts.volume === 0 || this.disposed || (typeof document !== 'undefined' && document.hidden))
+      return
     const ctx = this.ensureContext()
-    if (ctx && ctx.state === 'suspended')
-      void ctx.resume()
+    if (ctx?.state === 'suspended')
+      void ctx.resume().catch(() => { /* 浏览器仍限制播放时，下一次手势会再次尝试。 */ })
   }
 
-  play(name: SoundName, po: PlayOptions = {}): void {
-    if (this.opts.vibrate)
-      this.vibrate(name)
-    if (!this.opts.enabled || this.opts.volume <= 0)
+  play(name: SoundName, options?: PlayOptions): void {
+    if (this.disposed || (typeof document !== 'undefined' && document.hidden))
+      return
+    // 同一滑选手势中的极密集反馈合并，避免高频叠音和不必要的播放节点。
+    const now = performance.now()
+    if (name === 'select' || name === 'deselect' || name === 'ui') {
+      if (now - this.lastTap < 25)
+        return
+      this.lastTap = now
+    }
+    if (name === 'deal' || name === 'best' || name === 'minor' || name === 'mistake' || name === 'foul')
+      this.stop()
+    if (this.opts.vibrate && options?.haptic !== false && !options?.delay && typeof navigator !== 'undefined') {
+      const pattern = VIBRATION[name]
+      if (pattern !== undefined)
+        navigator.vibrate?.(pattern)
+    }
+    if (!this.opts.enabled || this.opts.volume === 0)
       return
     const ctx = this.ensureContext()
     if (!ctx || ctx.state !== 'running')
       return
-    const t = ctx.currentTime + 0.005
-    switch (name) {
-      case 'deal':
-        // 洗牌：三段较长的噪声；随后 9 张发牌，每张 55 ms
-        for (let i = 0; i < 3; i++)
-          this.burst(t + i * 0.09, { freq: 2600, q: 0.8, dur: 0.08, gain: 0.35 })
-        for (let i = 0; i < 9; i++)
-          this.burst(t + 0.32 + i * 0.055, { freq: 3200, q: 1.2, dur: 0.03, gain: 0.45 })
-        break
-      case 'select':
-        this.tone(t, { freq: NOTE.A5, dur: 0.04, gain: 0.12, type: 'sine' })
-        break
-      case 'place':
-        this.burst(t, { freq: 1800, q: 1, dur: 0.05, gain: 0.5 })
-        this.tone(t, { freq: 170, dur: 0.05, gain: 0.25, type: 'sine' })
-        break
-      case 'unplace':
-        this.tone(t, { freq: 620, to: 400, dur: 0.07, gain: 0.12, type: 'triangle' })
-        break
-      case 'ready':
-        this.tone(t, { freq: NOTE.E5, dur: 0.08, gain: 0.18, type: 'triangle' })
-        this.tone(t + 0.08, { freq: NOTE.A5, dur: 0.1, gain: 0.18, type: 'triangle' })
-        break
-      case 'foulWarn':
-        this.tone(t, { freq: NOTE.A3, dur: 0.09, gain: 0.16, type: 'square' })
-        this.tone(t + 0.14, { freq: NOTE.A3, dur: 0.09, gain: 0.16, type: 'square' })
-        break
-      case 'best': {
-        // 大三和弦琶音，连击时整体升调
-        const k = 2 ** (Math.min(po.streak ?? 0, 12) / 12)
-        ;[NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6].forEach((f, i) =>
-          this.tone(t + i * 0.07, { freq: f * k, dur: 0.12, gain: 0.2, type: 'triangle' }))
-        break
-      }
-      case 'minor':
-        this.tone(t, { freq: NOTE.C5, dur: 0.1, gain: 0.18, type: 'triangle' })
-        this.tone(t + 0.09, { freq: NOTE.E5, dur: 0.14, gain: 0.18, type: 'triangle' })
-        break
-      case 'mistake':
-        // 下行小三度，音量较低，避免刺耳
-        this.tone(t, { freq: NOTE.G4, dur: 0.14, gain: 0.16, type: 'triangle' })
-        this.tone(t + 0.13, { freq: NOTE.E4, dur: 0.22, gain: 0.16, type: 'triangle' })
-        break
-      case 'foul':
-        this.tone(t, { freq: NOTE.A3, to: NOTE.G3, dur: 0.3, gain: 0.2, type: 'triangle' })
-        this.burst(t, { freq: 400, q: 0.7, dur: 0.15, gain: 0.25 })
-        break
-      case 'xi':
-        ;[NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6, NOTE.E6].forEach((f, i) =>
-          this.tone(t + i * 0.06, { freq: f, dur: 0.12, gain: 0.16, type: 'triangle' }))
-        for (const f of [NOTE.C5, NOTE.E5, NOTE.G5])
-          this.tone(t + 0.34, { freq: f, dur: 0.6, gain: 0.1, type: 'sine' })
-        break
-      case 'tick':
-        this.burst(t, { freq: 4200, q: 3, dur: 0.02, gain: 0.3 })
-        break
+    if (this.voices.size >= 12) {
+      const oldest = this.voices.keys().next().value
+      if (oldest)
+        this.release(oldest)
     }
+    const source = ctx.createBufferSource()
+    const gain = ctx.createGain()
+    source.buffer = this.sample(name, ctx)
+    source.playbackRate.value = name === 'best' ? 2 ** (Math.min(Math.max(options?.streak ?? 0, 0), 12) / 12) : 1
+    // 极轻微的音色变化，连选不会像机械蜂鸣器；评级音阶保持准确。
+    if (name === 'select' || name === 'place' || name === 'unplace')
+      source.detune.value = (Math.random() - .5) * 35
+    source.connect(gain).connect(this.master!)
+    this.voices.set(source, gain)
+    source.onended = () => {
+      source.disconnect()
+      gain.disconnect()
+      this.voices.delete(source)
+    }
+    source.start(ctx.currentTime + .002 + Math.max(0, options?.delay ?? 0))
+  }
+
+  /** 下一手、退出、静音、后台均取消正在播放及尚未开始的声音。 */
+  stop(): void {
+    for (const source of this.voices.keys())
+      this.release(source)
+    if (this.opts.vibrate && typeof navigator !== 'undefined')
+      navigator.vibrate?.(0)
   }
 
   dispose(): void {
+    this.stop()
+    this.disposed = true
     if (typeof document !== 'undefined')
       document.removeEventListener('visibilitychange', this.onVisibility)
-    void this.ctx?.close()
+    void this.ctx?.close().catch(() => { /* 已关闭的上下文无需再次关闭。 */ })
+    this.master?.disconnect()
+    this.compressor?.disconnect()
     this.ctx = null
     this.master = null
+    this.compressor = null
+    this.samples.clear()
+  }
+
+  private release(source: AudioBufferSourceNode): void {
+    source.stop()
+    source.disconnect()
+    this.voices.get(source)?.disconnect()
+    this.voices.delete(source)
   }
 
   private ensureContext(): AudioContext | null {
     if (this.ctx)
       return this.ctx
-    const w = globalThis as unknown as { AudioContext?: AudioContextCtor, webkitAudioContext?: AudioContextCtor }
-    const Ctor = w.AudioContext ?? w.webkitAudioContext
+    const constructors = globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }
+    const Ctor = constructors.AudioContext ?? constructors.webkitAudioContext
     if (!Ctor)
       return null
-    const ctx = new Ctor()
+    const ctx = new Ctor({ latencyHint: 'interactive' })
     const master = ctx.createGain()
+    const compressor = ctx.createDynamicsCompressor()
     master.gain.value = this.opts.volume
-    master.connect(ctx.destination)
-    // 0.5 秒白噪声，所有噪声脉冲复用
-    const noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate)
-    const data = noise.getChannelData(0)
-    for (let i = 0; i < data.length; i++)
-      data[i] = Math.random() * 2 - 1
+    compressor.threshold.value = -9
+    compressor.knee.value = 12
+    compressor.ratio.value = 3
+    compressor.attack.value = .003
+    compressor.release.value = .12
+    master.connect(compressor).connect(ctx.destination)
     this.ctx = ctx
     this.master = master
-    this.noise = noise
+    this.compressor = compressor
     return ctx
   }
 
-  /** 带通滤波的噪声短脉冲：2 ms 起音，指数衰减 */
-  private burst(t: number, p: { freq: number, q: number, dur: number, gain: number }): void {
-    const ctx = this.ctx!
-    const src = ctx.createBufferSource()
-    src.buffer = this.noise
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = p.freq
-    filter.Q.value = p.q
-    const g = this.envelope(t, p.dur, p.gain)
-    src.connect(filter).connect(g).connect(this.master!)
-    // 从噪声缓冲的随机位置开始，避免每次听起来完全一样
-    src.start(t, Math.random() * 0.4, p.dur + 0.02)
-  }
-
-  private tone(t: number, p: { freq: number, to?: number, dur: number, gain: number, type: OscillatorType }): void {
-    const ctx = this.ctx!
-    const osc = ctx.createOscillator()
-    osc.type = p.type
-    osc.frequency.setValueAtTime(p.freq, t)
-    if (p.to)
-      osc.frequency.exponentialRampToValueAtTime(p.to, t + p.dur)
-    const g = this.envelope(t, p.dur, p.gain)
-    osc.connect(g).connect(this.master!)
-    osc.start(t)
-    osc.stop(t + p.dur + 0.02)
-  }
-
-  private envelope(t: number, dur: number, peak: number): GainNode {
-    const g = this.ctx!.createGain()
-    g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(peak, t + 0.002)
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-    return g
-  }
-
-  private vibrate(name: SoundName): void {
-    const pattern = VIBRATION[name]
-    const nav = globalThis.navigator as Navigator | undefined
-    if (pattern !== undefined && typeof nav?.vibrate === 'function')
-      nav.vibrate(pattern)
-  }
-
-  /** 页面切到后台时挂起，回到前台时恢复，避免后台占用音频设备 */
-  private handleVisibility(): void {
-    if (!this.ctx)
-      return
-    if (document.hidden)
-      void this.ctx.suspend()
-    else
-      void this.ctx.resume()
+  private sample(name: SoundName, ctx: AudioContext): AudioBuffer {
+    const existing = this.samples.get(name)
+    if (existing)
+      return existing
+    const rate = ctx.sampleRate
+    const buffer = ctx.createBuffer(1, Math.ceil(DURATION[name] * rate), rate)
+    const data = buffer.getChannelData(0)
+    switch (name) {
+      case 'deal':
+        for (let i = 0; i < 3; i++)
+          mixPaper(data, rate, i * .025, .055, .3, 42 + i)
+        for (let i = 0; i < 9; i++)
+          mixPaper(data, rate, .09 + i * .035, .025, .55, 100 + i)
+        break
+      case 'select':
+        mixPaper(data, rate, 0, .035, .32, 11)
+        mixTone(data, rate, 0, .025, 950, .045, 1100)
+        break
+      case 'deselect':
+        mixPaper(data, rate, 0, .025, .24, 12)
+        mixTone(data, rate, 0, .04, 700, .04, 450)
+        break
+      case 'place':
+        mixPaper(data, rate, 0, .05, .7, 21)
+        mixTone(data, rate, 0, .075, 185, .25, 95)
+        break
+      case 'unplace':
+        mixPaper(data, rate, 0, .055, .36, 22)
+        mixTone(data, rate, 0, .065, 540, .065, 350)
+        break
+      case 'ready':
+        mixTone(data, rate, 0, .13, NOTES[1], .17)
+        mixTone(data, rate, .065, .15, 880, .17)
+        break
+      case 'foulWarn':
+        mixTone(data, rate, 0, .11, 220, .17)
+        mixTone(data, rate, .13, .11, 196, .15)
+        break
+      case 'submit':
+        mixTone(data, rate, 0, .08, 329.63, .1, NOTES[1])
+        mixPaper(data, rate, 0, .02, .18, 31)
+        break
+      case 'best':
+        for (let i = 0; i < 4; i++)
+          mixTone(data, rate, i * .055, .24, NOTES[i], .23)
+        break
+      case 'minor':
+        mixTone(data, rate, 0, .16, NOTES[0], .15)
+        mixTone(data, rate, .09, .18, NOTES[1], .15)
+        break
+      case 'mistake':
+        mixTone(data, rate, 0, .18, 392, .15)
+        mixTone(data, rate, .14, .24, 329.63, .14)
+        break
+      case 'foul':
+        mixTone(data, rate, 0, .25, 185, .19, 135)
+        mixPaper(data, rate, 0, .08, .2, 51)
+        break
+      case 'xi':
+        for (let i = 0; i < NOTES.length; i++)
+          mixTone(data, rate, i * .045, .18, NOTES[i], .17)
+        for (let i = 0; i < 3; i++)
+          mixTone(data, rate, .3, .34, NOTES[i], .08)
+        break
+      case 'tick':
+        mixPaper(data, rate, 0, .025, .4, 61)
+        break
+      case 'ui':
+        mixTone(data, rate, 0, .04, 440, .055)
+        mixPaper(data, rate, 0, .015, .12, 71)
+        break
+    }
+    // 抑制瞬态峰值并收束尾部，静音边界不会产生数字爆音。
+    let peak = 0
+    for (const value of data)
+      peak = Math.max(peak, Math.abs(value))
+    const scale = peak > .75 ? .75 / peak : 1
+    const fade = Math.min(96, data.length)
+    for (let i = 0; i < data.length; i++)
+      data[i] *= scale * Math.min(1, (data.length - 1 - i) / fade)
+    this.samples.set(name, buffer)
+    return buffer
   }
 }

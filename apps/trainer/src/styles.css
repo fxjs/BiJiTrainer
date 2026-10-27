@@ -1,104 +1,77 @@
-/* 配色沿用 ThinkBiJi 讲义：浅色为牌桌呢绒灰绿底，深色为夜场牌桌；牌面在两种主题下都保持"实物白" */
 :root {
-  --ground: #ECEFE9;
-  --surface: #F7F8F4;
-  --ink: #17221D;
-  --muted: #56655D;
-  --rule: #D3D9D0;
-  --felt: #1D5A44;
-  --felt-soft: #DCE8E0;
-  --table: #184A39;
-  --table-ink: #EAF2EC;
-  --table-muted: #A9C4B5;
-  --gold: #F0C66B;
-  --red: #B03228;
-  --card: #FDFDFB;
-  --card-ink: #1A1D1B;
-  --card-red: #C0302A;
-  --card-edge: #BFC6BD;
-  /* 评级色：最优 / 次优 / 失误 / 倒水 */
-  --v-best: #2C7457;
-  --v-minor: #8C6824;
-  --v-mistake: #B03228;
-  --v-foul: #7A1F1A;
-  --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+  color-scheme: dark;
+  --ground: #080f10;
+  --surface: #101b1e;
+  --surface-raised: #16262a;
+  --ink: #eef8f5;
+  --muted: #9fb5b0;
+  --rule: #2a4041;
+  --felt: #91f5a4;
+  --felt-soft: #153b2d;
+  --table: #0c2a24;
+  --table-ink: #eef9f0;
+  --table-muted: #b0cec3;
+  --gold: #f4cc7a;
+  --red: #ff8c86;
+  --card: #f7faf2;
+  --card-ink: #13221b;
+  --card-red: #b02c3b;
+  --card-edge: #d3dfce;
+  --v-best: #91f5a4;
+  --v-minor: #f4cc7a;
+  --v-mistake: #ff8c86;
+  --v-foul: #ff6969;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
   --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #0D1612;
-    --surface: #14211B;
-    --ink: #E3EAE4;
-    --muted: #93A399;
-    --rule: #26372E;
-    --felt: #72C49E;
-    --felt-soft: #1B3328;
-    --table: #10301F;
-    --table-ink: #E3EEE6;
-    --table-muted: #8FB09E;
-    --red: #E7766A;
-    --card: #ECEBE4;
-    --card-edge: #3A4A41;
-    --v-best: #72C49E;
-    --v-minor: #D6AE5C;
-    --v-mistake: #E7766A;
-    --v-foul: #F0A095;
-    color-scheme: dark;
-  }
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
 }
 
 * { box-sizing: border-box; }
-
-html, body {
+html { min-width: 320px; min-height: 100%; }
+body {
   margin: 0;
-  background: var(--ground);
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at 10% 0%, #142b25 0, transparent 48%), var(--ground);
   color: var(--ink);
   font-family: var(--sans);
   font-size: 15px;
   line-height: 1.6;
-  /* 禁止双击缩放，避免连续点牌时页面跳动 */
-  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-
-button {
-  font: inherit;
-  color: inherit;
-}
-
-.num {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-
+button, input { font: inherit; color: inherit; }
+button { touch-action: manipulation; }
+button:disabled { cursor: not-allowed; }
+input { min-width: 0; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+::selection { background: var(--felt); color: var(--ground); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .btn {
+  min-height: 44px;
   border: 1px solid var(--rule);
   background: var(--surface);
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
-.btn:disabled {
-  opacity: .45;
-  cursor: default;
-}
-
-.btn.primary {
-  background: var(--felt);
-  border-color: var(--felt);
-  color: #fff;
+  border-radius: 9px;
+  padding: 9px 16px;
   font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
 }
-
-@media (prefers-color-scheme: dark) {
-  .btn.primary { color: #0D1612; }
+.btn.primary { border-color: transparent; background: var(--felt); color: var(--ground); font-weight: 750; }
+.btn:active:not(:disabled) { transform: translateY(1px) scale(.98); }
+.btn:disabled { opacity: .48; cursor: not-allowed; }
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { border-color: var(--muted); background: var(--surface-raised); }
+  .btn.primary:hover:not(:disabled) { background: #b0ffc0; border-color: transparent; }
 }
-
-:focus-visible {
-  outline: 2px solid var(--felt);
-  outline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }

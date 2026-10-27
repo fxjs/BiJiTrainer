@@ -6,7 +6,7 @@ import { computed, ref } from 'vue'
 import { signed } from '../format'
 import ArrangementView from './ArrangementView.vue'
 
-const props = defineProps<{ result: GradeDTO, source: PracticeSource['kind'] }>()
+const props = defineProps<{ result: GradeDTO, source: PracticeSource['kind'], blocked?: boolean }>()
 defineEmits<{ retry: [], next: [] }>()
 
 const showAlternatives = ref(false)
@@ -39,41 +39,41 @@ const summary = computed(() => {
 
 <template>
   <div class="result">
-    <div class="verdict" :class="result.verdict">
+    <header class="verdict" :class="result.verdict">
       <strong>{{ VERDICT_NAME[result.verdict] }}</strong>
-      <span>{{ summary }}</span>
-    </div>
+      <p>{{ summary }}</p>
+    </header>
 
     <p v-if="sourceNote" class="source">
       {{ sourceNote }}
     </p>
 
-    <ul v-if="result.tags.length" class="tags">
+    <ul v-if="result.tags.length" class="tags" aria-label="本手复盘要点">
       <li v-for="t in result.tags" :key="t.code">
         <strong>{{ t.title }}</strong>
         <span>{{ t.detail }}</span>
       </li>
     </ul>
 
-    <ArrangementView
-      title="你的摆法"
-      :s="result.player"
-      :legal-count="result.legalCount"
-      :highlight="sameAsBest"
-    />
-    <ArrangementView
-      v-if="!sameAsBest"
-      title="推荐摆法"
-      :s="result.best"
-      :legal-count="result.legalCount"
-      highlight
-    />
+    <div class="comparison">
+      <ArrangementView
+        title="你的摆法"
+        :s="result.player"
+        :legal-count="result.legalCount"
+        :highlight="sameAsBest"
+      />
+      <ArrangementView
+        v-if="!sameAsBest"
+        title="推荐摆法"
+        :s="result.best"
+        :legal-count="result.legalCount"
+        highlight
+      />
+    </div>
 
-    <div v-if="result.alternatives.length" class="alts">
-      <button type="button" class="link" @click="showAlternatives = !showAlternatives">
-        {{ showAlternatives ? '收起' : '查看' }}其他 {{ result.alternatives.length }} 个候选
-      </button>
-      <template v-if="showAlternatives">
+    <details v-if="result.alternatives.length" class="alts" @toggle="showAlternatives = ($event.target as HTMLDetailsElement).open">
+      <summary>其他 {{ result.alternatives.length }} 个候选摆法</summary>
+      <div v-if="showAlternatives" class="alternative-list">
         <ArrangementView
           v-for="(a, i) in result.alternatives"
           :key="i"
@@ -81,19 +81,19 @@ const summary = computed(() => {
           :s="a"
           :legal-count="result.legalCount"
         />
-      </template>
-    </div>
+      </div>
+    </details>
 
     <p class="foot">
       模拟 {{ result.samples }} 局：其余 45 张随机发给 5 名对手，对手按胜率表摆牌。
-      大数为平均得分（分／手），推荐摆法取平均得分最高者。用时 {{ result.elapsedMs }} ms。
+      平均得分单位为分／手，推荐摆法取平均得分最高者。用时 {{ result.elapsedMs }} ms。
     </p>
 
     <div class="actions">
-      <button type="button" class="btn" @click="$emit('retry')">
+      <button type="button" class="btn" :disabled="blocked" @click="$emit('retry')">
         重摆这一手
       </button>
-      <button type="button" class="btn primary" @click="$emit('next')">
+      <button type="button" class="btn primary" :disabled="blocked" @click="$emit('next')">
         下一手
       </button>
     </div>
@@ -103,26 +103,30 @@ const summary = computed(() => {
 <style scoped>
 .result {
   display: grid;
-  gap: 12px;
+  gap: 20px;
+  min-width: 0;
 }
 
 .verdict {
-  display: grid;
-  gap: 2px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border-left: 5px solid currentColor;
-  background: var(--surface);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .verdict strong {
-  font-family: var(--serif);
-  font-size: 20px;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -.02em;
 }
 
-.verdict span {
+.verdict p {
+  margin: 0;
   color: var(--ink);
   font-size: 14px;
+  line-height: 1.65;
 }
 
 .verdict.best { color: var(--v-best); }
@@ -130,10 +134,13 @@ const summary = computed(() => {
 .verdict.mistake { color: var(--v-mistake); }
 .verdict.foul { color: var(--v-foul); }
 
-.source {
+.source,
+.foot {
   margin: 0;
-  font-size: 13px;
   color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 75ch;
 }
 
 .tags {
@@ -141,51 +148,61 @@ const summary = computed(() => {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .tags li {
   display: grid;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-}
-
-.tags strong {
+  gap: 4px;
   font-size: 14px;
+  line-height: 1.6;
 }
 
-.tags span {
-  font-size: 13px;
-  color: var(--muted);
+.tags strong { color: var(--gold); }
+.tags span { color: var(--muted); }
+
+.comparison,
+.alternative-list {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
 }
 
 .alts {
-  display: grid;
-  gap: 10px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
 }
 
-.link {
-  justify-self: start;
-  background: none;
-  border: none;
-  padding: 0;
+.alts summary {
+  padding: 14px 0;
+  min-height: 44px;
+  box-sizing: border-box;
   color: var(--felt);
+  font-size: 14px;
   cursor: pointer;
-  text-decoration: underline;
 }
 
-.foot {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
+.alts summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
 }
+
+.alternative-list { padding-bottom: 16px; }
 
 .actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.actions .btn { min-height: 44px; }
+
+@media (min-width: 800px) {
+  .comparison,
+  .alternative-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .actions .btn { flex: 1; }
 }
 </style>

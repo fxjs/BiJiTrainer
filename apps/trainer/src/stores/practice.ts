@@ -50,6 +50,19 @@ export const usePracticeStore = defineStore('practice', () => {
   const error = ref<string | null>(null)
   const stats = ref<SessionStats>({ hands: 0, best: 0, foul: 0, evLossSum: 0, streak: 0 })
   const source = ref<PracticeSource>({ kind: 'free' })
+  let generation = 0
+
+  /** 清掉前一名号的牌面、评估和会话统计，并使尚未返回的求解失效。 */
+  function resetSession() {
+    generation++
+    sound.stop()
+    board.value = createBoard(dealHand())
+    source.value = { kind: 'free' }
+    phase.value = 'arranging'
+    result.value = null
+    error.value = null
+    stats.value = { hands: 0, best: 0, foul: 0, evLossSum: 0, streak: 0 }
+  }
 
   const pool = computed(() => poolCards(board.value, sortMode.value))
   const lanes = computed(() => ([0, 1, 2] as Lane[]).map(l => ({
@@ -68,6 +81,7 @@ export const usePracticeStore = defineStore('practice', () => {
   }
 
   function newHand() {
+    generation++
     board.value = createBoard(dealHand())
     source.value = { kind: 'free' }
     phase.value = 'arranging'
@@ -78,6 +92,7 @@ export const usePracticeStore = defineStore('practice', () => {
 
   /** 复习错题：随机做一次同色花色置换后重新摆 */
   function startReview(item: MistakeItem) {
+    generation++
     const variant = crypto.getRandomValues(new Uint32Array(1))[0] % PERMUTATION_COUNT
     board.value = createBoard(permuteSuits(item.hand, variant))
     source.value = { kind: 'review', id: item.id }
@@ -89,18 +104,22 @@ export const usePracticeStore = defineStore('practice', () => {
 
   /** 同一手牌重新摆：看过推荐摆法后的结果不计入记录、错题本与本次统计 */
   function retry() {
+    generation++
+    sound.stop()
     board.value = clearLanes(board.value)
     source.value = { kind: 'retry' }
     phase.value = 'arranging'
     result.value = null
     error.value = null
+    sound.play('unplace')
   }
 
   function toggle(card: Card) {
     if (phase.value !== 'arranging')
       return
+    const wasSelected = selected.value.includes(card)
     if (update(toggleSelect(board.value, card)))
-      sound.play('select')
+      sound.play(wasSelected ? 'deselect' : 'select')
   }
 
   /** 滑动多选：把一张牌设为选中/未选中，已处于目标状态时不重复播放音效 */
@@ -108,25 +127,32 @@ export const usePracticeStore = defineStore('practice', () => {
     if (phase.value !== 'arranging')
       return
     if (update(setCardSelected(board.value, card, on)))
-      sound.play('select')
+      sound.play(on ? 'select' : 'deselect')
+  }
+
+  function placementFeedback(wasFoul: boolean) {
+    sound.play('place')
+    if (foul.value.any && !wasFoul)
+      sound.play('foulWarn', { delay: .06 })
+    else if (complete.value && !foul.value.any)
+      sound.play('ready', { delay: .07 })
   }
 
   /** 整道向头道（+1）或尾道（−1）移动；两道有牌时整体互换 */
   function move(lane: Lane, dir: -1 | 1) {
     if (phase.value !== 'arranging')
       return
+    const wasFoul = foul.value.any
     if (update(moveLane(board.value, lane, dir)))
-      sound.play('place')
+      placementFeedback(wasFoul)
   }
 
   function place(lane: Lane) {
     if (phase.value !== 'arranging')
       return
-    if (update(placeSelected(board.value, lane))) {
-      sound.play('place')
-      if (complete.value)
-        sound.play(foul.value.any ? 'foulWarn' : 'ready')
-    }
+    const wasFoul = foul.value.any
+    if (update(placeSelected(board.value, lane)))
+      placementFeedback(wasFoul)
   }
 
   function unplace(lane: Lane, card: Card) {
@@ -137,16 +163,18 @@ export const usePracticeStore = defineStore('practice', () => {
   }
 
   function clear() {
-    if (phase.value === 'arranging')
-      update(clearLanes(board.value))
+    if (phase.value === 'arranging' && update(clearLanes(board.value)))
+      sound.play('unplace')
   }
 
   async function submit() {
-    if (phase.value !== 'arranging' || !complete.value)
+    if (phase.value !== 'arranging' || !complete.value || !records.ready || records.saving || records.pendingSave)
       return
     phase.value = 'evaluating'
+    sound.play('submit')
     error.value = null
     const b = board.value
+    const version = generation
     try {
       const seed = crypto.getRandomValues(new Uint32Array(1))[0]
       const r = await evaluateInWorker({
@@ -155,12 +183,16 @@ export const usePracticeStore = defineStore('practice', () => {
         samples: SAMPLES,
         seed,
       })
+      if (version !== generation)
+        return
       result.value = r
       phase.value = 'result'
       record(r, source.value.kind !== 'retry')
-      void records.save(r, [...b.hand], source.value)
+      await records.save(r, [...b.hand], source.value)
     }
     catch (e) {
+      if (version !== generation)
+        return
       error.value = e instanceof Error ? e.message : String(e)
       phase.value = 'arranging'
     }
@@ -190,7 +222,7 @@ export const usePracticeStore = defineStore('practice', () => {
     }
     // 玩家本手成喜时，评级音之后再补一声
     if (r.player.xi.length > 0)
-      setTimeout(() => sound.play('xi'), 450)
+      sound.play('xi', { delay: .4, haptic: false })
   }
 
   return {
@@ -206,6 +238,7 @@ export const usePracticeStore = defineStore('practice', () => {
     foul,
     complete,
     selected,
+    resetSession,
     newHand,
     startReview,
     retry,
