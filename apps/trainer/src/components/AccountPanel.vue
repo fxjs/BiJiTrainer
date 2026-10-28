@@ -7,9 +7,9 @@ const props = withDefaults(defineProps<{ dataBusy?: boolean }>(), { dataBusy: fa
 const auth = useAuthStore()
 const id = useId()
 const name = ref('')
-const pending = ref<'init' | 'roll' | 'enter' | 'leave' | null>(null)
+const pending = ref<'init' | 'roll' | 'enter' | 'leave' | 'retire' | null>(null)
 const resolvedRoll = ref(false)
-const confirming = ref(false)
+const confirming = ref<'leave' | 'retire' | null>(null)
 const working = computed(() => auth.busy || props.dataBusy || pending.value !== null)
 const locked = computed(() => working.value || !auth.ready)
 
@@ -20,7 +20,7 @@ watch(() => auth.candidate?.name, (candidate) => {
 watch(() => auth.identity?.id, () => {
   name.value = auth.candidate?.name ?? ''
   resolvedRoll.value = false
-  confirming.value = false
+  confirming.value = null
 })
 
 async function initialize(force = false) {
@@ -64,13 +64,29 @@ async function enter() {
 async function leave() {
   if (locked.value || !auth.identity)
     return
-  if (!confirming.value) {
-    confirming.value = true
+  if (confirming.value !== 'leave') {
+    confirming.value = 'leave'
     return
   }
   pending.value = 'leave'
   try {
     await auth.leave()
+  }
+  finally {
+    pending.value = null
+  }
+}
+
+async function retire() {
+  if (locked.value || !auth.identity)
+    return
+  if (confirming.value !== 'retire') {
+    confirming.value = 'retire'
+    return
+  }
+  pending.value = 'retire'
+  try {
+    await auth.retire()
   }
   finally {
     pending.value = null
@@ -84,20 +100,30 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="account" aria-label="训练名号" :aria-busy="working || !auth.ready">
+  <section class="account" aria-label="游戏名号" :aria-busy="working || !auth.ready">
     <header v-if="auth.identity" class="account-heading">
       <h2>{{ auth.identity.name }}</h2>
       <div class="identity-actions">
-        <button v-if="confirming" type="button" class="btn" :disabled="locked" @click="confirming = false">取消</button>
-        <button type="button" class="btn" :disabled="locked" @click="leave">{{ confirming ? '确认切换' : '切换名号' }}</button>
+        <button v-if="confirming" type="button" class="btn" :disabled="locked" @click="confirming = null">取消</button>
+        <button type="button" class="btn" :disabled="locked" @click="leave">{{ confirming === 'leave' ? '确认切换' : '切换名号' }}</button>
+        <button
+          type="button"
+          class="btn retire"
+          :disabled="locked"
+          :aria-describedby="confirming === 'retire' ? `${id}-retire-note` : undefined"
+          @click="retire"
+        >
+          {{ pending === 'retire' ? '正在隐退…' : confirming === 'retire' ? '确认隐退' : '隐退江湖（删除）' }}
+        </button>
       </div>
     </header>
-    <p v-if="auth.identity && confirming" class="switch-note">记住「{{ auth.identity.name }}」，下次输入即可回来。</p>
+    <p v-if="auth.identity && confirming === 'leave'" class="switch-note">记住「{{ auth.identity.name }}」，下次输入即可回来。切换不会删除记录，也不会释放名号。</p>
+    <p v-if="auth.identity && confirming === 'retire'" :id="`${id}-retire-note`" class="retire-note" role="alert">隐退会删除「{{ auth.identity.name }}」的全部对局记录与错题，所有设备都会退出此名号；名号将可被他人选取。此操作不可恢复。</p>
 
     <form v-if="!auth.identity" class="account-form" @submit.prevent="enter">
       <fieldset :disabled="locked">
         <legend class="sr-only">
-          进入训练
+          开始游戏
         </legend>
         <div class="name-control" :class="{ 'is-resolved': resolvedRoll }">
           <label class="sr-only" :for="`${id}-name`">名号</label>
@@ -131,7 +157,7 @@ onMounted(() => {
           </button>
         </div>
         <button type="submit" class="btn primary" :disabled="!name.trim()">
-          进入训练
+          开始游戏
         </button>
       </fieldset>
     </form>
@@ -168,6 +194,8 @@ onMounted(() => {
 
 .identity-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .switch-note { margin: 0; color: var(--muted); font-size: 13px; }
+.retire { color: var(--red); }
+.retire-note { margin: 0; color: var(--red); font-size: 14px; line-height: 1.7; }
 
 h2 {
   min-width: 0;

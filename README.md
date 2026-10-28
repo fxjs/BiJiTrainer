@@ -1,15 +1,15 @@
 # BiJiTrainer
 
-六人比鸡配牌训练。规则与策略依据 [ThinkBiJi](../ThinkBiJi) 讲义，规划及实现说明见 [docs/PLAN.md](docs/PLAN.md)。
+六人比鸡休闲小游戏。规则与策略依据 [ThinkBiJi](../ThinkBiJi) 讲义，规划及实现说明见 [docs/PLAN.md](docs/PLAN.md)。
 
 ## 当前功能
 
-- 一个登录入口：后端随机给出武侠人物名，骰子重新抽取，点击“进入训练”即建立身份并登录。没有注册、邮箱、密码或邮件验证界面。
-- 输入原名号可以找回原记录；当前浏览器自动记住身份，刷新后继续。
-- 自由练习、蒙特卡洛推荐、错因诊断、间隔复习错题本、训练统计。
-- 练习记录与错题本保存在 Supabase，按人物 UUID 隔离；不读取、迁移或上传旧的本机训练数据。
+- 一个登录入口：后端随机给出武侠人物名，骰子重新抽取，点击“开始游戏”即建立身份并登录。没有注册、邮箱、密码或邮件验证界面。
+- 输入尚未隐退的原名号可以找回原记录；当前浏览器自动记住身份，刷新后继续。
+- 自由摆牌、蒙特卡洛推荐、错因诊断、间隔复习错题本、对局统计。
+- 对局记录与错题本保存在 Supabase，按人物 UUID 隔离；不读取、迁移或上传旧的本机游戏数据。
 - 深色牌桌、滑动多选、整道换位及短时合成动效；大错题本每页最多渲染 20 手。
-- 配牌页按可视高度布局，手牌、三道与排序／清空／换一手／提交同屏可达；低高度横屏改为左右分栏，短屏使用紧凑牌面，触控目标至少 44px，不缩放整页。
+- 配牌页紧凑排列三道与操作区，手牌首行完整显示 9 张；手机横屏将三道并排，手牌与按钮使用整行宽度，避免左右分栏挤小牌面。道名与张数居中对齐，黄色落牌边框保留内边距，提示区上下居中；窄屏手牌按可用宽度缩小，移动箭头与操作按钮保留 44px 触控区域，不缩放整页。右上角提供“横屏全屏”及退出入口；浏览器允许时锁定横屏，不支持全屏或方向锁定时明确提示或引导手动横放手机。
 - 结果页的“重摆这一手”和“下一手”常驻底部，复盘详情独立滚动，模拟说明按需展开；错题本、统计等浏览页面仍可自然滚动。
 - 缓存式 Web Audio 触感音效、独立震动、落牌与最优反馈试听；后台及静音时取消未播音效并挂起音频设备。
 
@@ -18,12 +18,14 @@
 后台 `character_pool` 初始包含 **100 个不重复的武侠人物名**。前端只获取一个候选，不内置或下载完整名号表。
 
 - 预览名号保留 10 分钟；多个会话不会同时拿到同一个有效候选。
-- 掷骰不消耗名号；首次确认进入后，该名号永久退出新用户可分配池。
-- 切换名号不删除原记录，也不会把已用名号重新放回池中。
-- 新设备或清除浏览器登录数据后，输入已使用的原名号，可以重新绑定同一人物身份。
-- 名号用完时不会虚构新名字、追加数字或重复分配；仍可找回已有名号。
+- 掷骰不消耗名号；首次确认进入后，该名号退出新用户可分配池，直到主动隐退。
+- “切换名号”只退出当前设备，不删除原记录，也不会释放名号；输入原名号仍可回来。
+- “隐退江湖（删除）”是独立的危险操作，必须再次点击“确认隐退”。成功后删除该人物全部对局记录与错题、退出所有设备的此人物身份，并让名号可被他人选取；不可恢复。
+- 隐退返还同名的新 UUID，不复用原人物 UUID。旧设备绑定、旧候选或延迟到达的旧人物请求不能访问新人物的数据。
+- 新设备或清除浏览器登录数据后，输入尚未隐退的已用原名号，可以重新绑定同一人物身份；隐退后的旧记录无法找回。同名被重新领取后，主动输入此名号恢复的是新人物，昵称弱凭证的访问边界不变。
+- 名号用完时不会虚构新名字、追加数字或重复分配；仍可找回未隐退的已有名号。
 
-**这是刻意简化的昵称凭证方案：知道名号的人就能访问该身份的记录，不具备密码级保护。名号和仓库中的种子列表不是秘密，仅适合非敏感训练数据。** Supabase 匿名认证负责会话传输，人物 UUID 与后台成员关系负责数据归属，不能把 Supabase API 的匿名 Key 当作用户身份。
+**这是刻意简化的昵称凭证方案：知道名号的人就能访问该身份的记录，不具备密码级保护。名号和仓库中的种子列表不是秘密，仅适合非敏感游戏数据。** Supabase 匿名认证负责会话传输，人物 UUID 与后台成员关系负责数据归属，不能把 Supabase API 的匿名 Key 当作用户身份。
 
 补充名号仅需管理员在后台插入尚未使用的真实人物名，例如：
 
@@ -36,8 +38,8 @@ insert into public.character_pool (name) values ('楚留香'), ('陆小凤');
 - `packages/core`：牌编码、牌型强度、摆法、倒水、喜牌与结算。
 - `packages/solver`：胜率表、蒙特卡洛精排与错因诊断；求解在 Web Worker 中运行。
 - `packages/audio`：按需合成并缓存纸面瞬态与柔和提示音，无音频素材下载。
-- `apps/trainer`：Vite + Vue 3 + Pinia + UnoCSS 训练界面。
-- `supabase/migrations`：名号池、会话成员关系、训练数据、RLS 与事务 RPC。
+- `apps/trainer`：Vite + Vue 3 + Pinia + UnoCSS 游戏界面。
+- `supabase/migrations`：名号池、会话成员关系、对局数据、RLS 与事务 RPC。
 - `supabase/tests/database`：分配、找回、隔离与事务行为回归。
 - `scripts/tables`、`scripts/golden`：胜率表训练与 Python 对拍基准。
 
@@ -45,9 +47,12 @@ insert into public.character_pool (name) values ('楚留香'), ('陆小凤');
 
 ### 1. 初始化数据库
 
-在项目 **SQL Editor** 中执行一次：
+在项目 **SQL Editor** 中按日期顺序各执行一次：
 
-`supabase/migrations/20261027000000_account_training_data.sql`
+1. `supabase/migrations/20261027000000_account_training_data.sql`
+2. `supabase/migrations/20261028000000_retire_character.sql`
+
+已经执行第一份迁移的项目只需补执行第二份，不能重跑建表迁移。
 
 也可以使用已授权并关联该项目的 Supabase CLI：
 
@@ -57,9 +62,18 @@ pnpm dlx supabase link --project-ref kombknykyixfljbffbtj
 pnpm dlx supabase db push
 ```
 
-`character_pool` 和 `character_sessions` 不允许客户端直接读写。`reserve_character`、`claim_character`、`restore_character`、`current_character`、`leave_character` 提供受控的名号操作。训练数据按 `character_id` 保存，RLS 只允许会话访问当前绑定人物的数据。
+登录凭据由 CLI 管理，不写入前端环境变量或仓库；本地项目关联信息位于已忽略的 `supabase/.temp`。后续可由已授权的 CLI 执行 SQL，无需反复打开 SQL Editor。若数据库直连不可用，可使用官方 Management API 的 HTTPS 通道：
 
-一手练习和相应错题进度在同一事务保存；稳定重试键避免重复计数或把后来的复习进度回退。保存、清空和切换接口均核对捕获的身份，避免旧请求误操作新身份。匿名认证用户被清理时，不会连带删除已用人物与训练记录。
+```bash
+pnpm dlx supabase db query --linked 'select version, name from supabase_migrations.schema_migrations order by version;'
+pnpm dlx supabase db query --linked --file path/to/reviewed-operation.sql
+```
+
+通过 SQL 接口应用迁移时，迁移语句和对应的标准 `supabase_migrations.schema_migrations` 记录必须在同一事务提交；已有手工建库应先核对结构再补记基线，不能重跑初始化脚本。针对同一项目的 CLI 连库操作串行执行，避免初始化临时登录角色时发生竞争。此授权用于本机助手操作；GitHub Actions 不会自动获得本机凭据，持续集成的授权需另外配置。
+
+`character_pool` 和 `character_sessions` 不允许客户端直接读写。`reserve_character`、`claim_character`、`restore_character`、`current_character`、`leave_character`、`retire_character` 提供受控的名号操作。对局数据按 `character_id` 保存，RLS 只允许会话访问当前绑定人物的数据。
+
+一手对局和相应错题进度在同一事务保存；稳定重试键避免重复计数或把后来的复习进度回退。保存、清空、切换和隐退接口均核对捕获的身份，避免旧请求误操作新身份。隐退在同一事务删除人物数据、全部成员关系与旧 UUID，再返还新 UUID 的同名候选；任何一步失败都会回滚，前端保留原身份并显示错误，可重试。人物行锁让进行中的保存、清空和找回与隐退有确定先后，不锁其他设备的认证行，避免共享设备交叉等待。匿名认证用户被清理时，不会连带删除已用人物与对局记录；这与主动隐退不同。
 
 **项目 Secret Key 不是数据库密码，也不能代替 Management API Access Token。** Pages 构建不会自动执行远程数据库迁移。
 
@@ -105,6 +119,8 @@ pnpm dlx supabase status
 ```
 
 API 为 `http://127.0.0.1:54331`，数据库端口 `54332`。把本地 API URL 与 `supabase status` 中的公开 Key 填入 `.env.local`，再重启开发服务器。不要使用状态输出中的 Secret Key。仅当确认是可丢弃的本地测试库时，才用 `pnpm dlx supabase db reset --local` 重建已有旧版本数据库。
+
+数据库回归包括 `retire_character.test.sql` 的权限、删除、UUID 隔离、共享设备与末步失败回滚，以及 `retire_character_concurrency.test.sql` 的真实多连接保存／清空／找回／重复隐退竞争。并发测试需要 pgTAP 和 dblink 扩展，会提交隔离的测试 UUID／名号以便跨连接读取，并在用例前后清理；仅在可丢弃的本地测试库运行。
 
 ```bash
 pnpm golden    # 重新生成 Python 对拍基准；需要 ../ThinkBiJi/sim 或 THINKBIJI_SIM

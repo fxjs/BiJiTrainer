@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
       <header class="sheet-header">
         <div>
           <h2 :id="`${id}-title`">
-            训练设置
+            游戏设置
           </h2>
           <p :id="`${id}-description`" class="hint">
             调整出牌时的声音与触感，即时生效。

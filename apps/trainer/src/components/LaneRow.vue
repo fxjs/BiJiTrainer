@@ -102,10 +102,10 @@ function onRowClick() {
 .lane {
   position: relative;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 88px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
-  gap: 4px;
-  padding: 2px 0;
+  gap: 8px;
+  padding: 4px 8px;
   border: 1px solid transparent;
   border-radius: 8px;
 }
@@ -122,7 +122,7 @@ function onRowClick() {
 .meta {
   display: grid;
   align-content: center;
-  justify-items: start;
+  justify-items: center;
   min-width: 0;
   gap: 0;
 }
@@ -157,6 +157,7 @@ function onRowClick() {
   line-height: 1.25;
   min-width: 0;
   max-width: 100%;
+  text-align: center;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -179,7 +180,9 @@ function onRowClick() {
 
 .move {
   display: flex;
-  gap: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .move-btn {
@@ -237,13 +240,7 @@ function onRowClick() {
   }
 }
 
-@media (max-height: 740px) {
-  .lane { padding-block: 0; }
-}
 
-@media (min-width: 700px) and (min-height: 501px) {
-  .lane { grid-template-columns: 100px minmax(0, 1fr) 88px; }
-}
 
 @media (max-width: 559px) and (max-height: 500px) {
   /* The foul verdict replaces rank details already visible on the cards. */

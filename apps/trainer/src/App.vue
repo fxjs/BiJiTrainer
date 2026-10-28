@@ -20,13 +20,57 @@ const records = useRecordsStore()
 const { stats } = storeToRefs(practice)
 const { dueMistakes } = storeToRefs(records)
 const settingsOpen = ref(false)
+const fullscreen = ref(false)
+const fullscreenBusy = ref(false)
+const fullscreenNote = ref('')
+
+function syncFullscreen() {
+  fullscreen.value = !!document.fullscreenElement
+  if (!fullscreen.value)
+    fullscreenNote.value = ''
+}
+
+async function toggleFullscreen() {
+  if (fullscreenBusy.value)
+    return
+  fullscreenNote.value = ''
+  if (!document.fullscreenElement && !document.documentElement.requestFullscreen) {
+    fullscreenNote.value = '当前浏览器不支持全屏，请横放手机游玩。'
+    return
+  }
+  fullscreenBusy.value = true
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+      return
+    }
+    await document.documentElement.requestFullscreen()
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (mode: string) => Promise<void> }
+    try {
+      if (orientation?.lock)
+        await orientation.lock('landscape')
+    }
+    catch {
+      // Fullscreen still works when the browser refuses orientation locking.
+    }
+    if (window.innerHeight > window.innerWidth)
+      fullscreenNote.value = '已进入全屏，请横放手机游玩。'
+  }
+  catch {
+    fullscreenNote.value = '未能切换全屏，请重试或横放手机游玩。'
+  }
+  finally {
+    fullscreen.value = !!document.fullscreenElement
+    fullscreenBusy.value = false
+  }
+}
 
 type Tab = 'practice' | 'mistakes' | 'stats' | 'account'
 const tab = ref<Tab>('practice')
 const TABS: { id: Tab, label: string }[] = [
-  { id: 'practice', label: '配牌训练' },
+  { id: 'practice', label: '摆牌' },
   { id: 'mistakes', label: '错题本' },
-  { id: 'stats', label: '训练统计' },
+  { id: 'stats', label: '对局统计' },
   { id: 'account', label: '我的名号' },
 ]
 const dataBusy = computed(() => records.saving || records.pendingSave || practice.phase === 'evaluating')
@@ -75,11 +119,14 @@ const unlock = () => sound.unlock()
 onMounted(() => {
   document.addEventListener('pointerdown', unlock, { capture: true, passive: true })
   document.addEventListener('keydown', unlock, { capture: true, passive: true })
+  document.addEventListener('fullscreenchange', syncFullscreen)
+  syncFullscreen()
   void auth.init()
 })
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', unlock, { capture: true })
   document.removeEventListener('keydown', unlock, { capture: true })
+  document.removeEventListener('fullscreenchange', syncFullscreen)
 })
 </script>
 
@@ -89,7 +136,7 @@ onBeforeUnmount(() => {
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">♠</span>
         <div class="brand-copy">
-          <h1>比鸡配牌训练</h1>
+          <h1>比鸡小游戏</h1>
           <p v-if="auth.identity" class="sub">{{ summary }}</p>
         </div>
       </div>
@@ -103,6 +150,21 @@ onBeforeUnmount(() => {
         >
           <span class="cloud-dot" aria-hidden="true" />
           {{ cloudStatus }}
+        </button>
+        <button
+          v-if="auth.identity && tab === 'practice' && records.ready"
+          type="button"
+          class="btn fullscreen-button"
+          :aria-label="fullscreen ? '退出全屏' : '横屏全屏'"
+          :title="fullscreen ? '退出全屏' : '横屏全屏'"
+          :aria-pressed="fullscreen"
+          :disabled="fullscreenBusy"
+          @click="toggleFullscreen"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path v-if="fullscreen" d="M3 9h6V3m12 6h-6V3M3 15h6v6m12-6h-6v6" />
+            <path v-else d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
+          </svg>
         </button>
         <button type="button" class="btn settings-button" aria-label="设置" aria-haspopup="dialog" @click="settingsOpen = true">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
@@ -131,6 +193,7 @@ onBeforeUnmount(() => {
     </nav>
 
     <main>
+      <p v-if="fullscreenNote" class="fullscreen-note" role="status">{{ fullscreenNote }}</p>
       <div v-if="!auth.ready" class="loading-state" role="status">
         <span class="loading-mark" aria-hidden="true">♠</span>
         <p>正在连接…</p>
@@ -193,6 +256,8 @@ onBeforeUnmount(() => {
 .training-screen h1 { font-size: 18px; }
 .training-screen .top-actions { flex-direction: row; gap: 8px; }
 .training-screen .settings-button, .training-screen .cloud-button { min-height: 44px; }
+.fullscreen-button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; }
+.fullscreen-note { margin: 0; color: var(--gold); font-size: 12px; }
 .training-screen main { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
 .training-screen main > :deep(.practice) { flex: 1; min-height: 0; }
 .training-screen .storage-alert { flex: none; margin: 0; padding: 8px 12px; gap: 8px; }
@@ -284,11 +349,13 @@ main { min-width: 0; }
   .tabs { gap: 2px; padding: 4px; }
   .tabs button { padding: 9px 5px; font-size: 12px; }
   .badge { margin-left: 1px; min-width: 15px; height: 15px; }
+  .training-screen .cloud-button, .training-screen .settings-label { display: none; }
+  .training-screen .settings-button { width: 44px; padding: 0; justify-content: center; }
   .app-footer { font-size: 10px; }
 }
 @media (max-height: 740px) {
   .app.training-screen {
-    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) 96px;
     grid-template-rows: auto minmax(0, 1fr);
     gap: 8px;
     padding: calc(6px + env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));

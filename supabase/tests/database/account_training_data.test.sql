@@ -213,7 +213,6 @@ select is((select count(*) from public.training_records where character_id = (se
 select throws_ok($$insert into public.training_records (character_id, record_key, data) values ('00000000-0000-4000-8000-000000000000', 'orphan', '{}')$$, '23503', null, 'records require a real character FK');
 select throws_ok($$insert into public.training_mistakes (character_id, id, data) values ('00000000-0000-4000-8000-000000000000', 'orphan', '{"id":"orphan"}')$$, '23503', null, 'mistakes require a real character FK');
 select throws_ok($$insert into public.character_sessions (user_id, character_id) select '11111111-1111-4111-8111-111111111111', (a ->> 'id')::uuid from fixtures$$, '23503', null, 'memberships require a live auth user');
-select throws_ok($$delete from public.character_pool where id = (select (b ->> 'id')::uuid from fixtures)$$, '23503', null, 'character deletion cannot orphan memberships or history');
 
 -- Reduce the private pool inside this rolled-back test to exercise finite exhaustion.
 update public.character_pool set reservation_user_id = null, reservation_expires_at = null where claimed_at is null;

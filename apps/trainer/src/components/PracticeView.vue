@@ -283,9 +283,9 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .table {
-  flex: 1;
+  flex: none;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
   min-width: 0;
   padding: 12px;
   background: var(--table);
@@ -319,16 +319,28 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 .lanes {
   display: grid;
-  align-content: space-evenly;
-  gap: 4px;
+  align-content: start;
+  gap: 8px;
+}
+
+/* The head cannot move up and the tail cannot move down. */
+.lanes > :first-child :deep(.move-btn:first-child),
+.lanes > :last-child :deep(.move-btn:last-child) {
+  display: none;
 }
 
 .status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-content: center;
   margin: 8px 4px 0;
-  padding-top: 4px;
+  padding-block: 4px;
   border-top: 1px solid var(--rule);
-  /* Two stable lines keep the hand in place through selection and foul feedback. */
-  min-height: calc(2.8em + 5px);
+  /* Reserve two centered lines so selection and foul feedback never move the hand. */
+  min-height: calc(2.8em + 9px);
+  text-align: center;
   color: var(--table-muted);
   font-size: 12px;
   line-height: 1.4;
@@ -367,14 +379,14 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .pool {
-  --hand-card-width: clamp(44px, 7dvh, 56px);
-  --hand-card-height: calc(var(--hand-card-width) * var(--card-aspect, 1.4));
+  --hand-card-width: min(clamp(44px, 7dvh, 56px), calc((100cqw - 32px) / 9));
+  --hand-card-height: max(44px, calc(var(--hand-card-width) * var(--card-aspect, 1.4)));
   display: grid;
   grid-template-columns: repeat(9, var(--hand-card-width));
   grid-auto-rows: var(--hand-card-height);
   justify-content: center;
   align-content: start;
-  gap: 8px;
+  gap: 4px;
   min-height: calc(var(--hand-card-height) + 12px);
   padding: 10px 0 2px;
   /* Horizontal gestures select cards; vertical gestures remain native. */
@@ -415,14 +427,6 @@ function onCardClick(e: MouseEvent, card: Card) {
   font-size: 13px;
 }
 
-@container (max-width: 600px) {
-  .pool {
-    --hand-card-width: clamp(44px, min(7dvh, calc((100cqw - 16px) / 5)), 56px);
-    grid-template-columns: repeat(5, var(--hand-card-width));
-    column-gap: 4px;
-    min-height: calc(var(--hand-card-height) * 2 + 20px);
-  }
-}
 
 @media (max-width: 600px), (max-height: 500px) {
   .bar {
@@ -446,7 +450,7 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 @media (max-height: 740px) {
   .practice { --lane-card-width: 44px; gap: 8px; }
-  .table { padding: 6px; grid-template-rows: minmax(0, 1fr) auto; }
+  .table { padding: 6px; grid-template-rows: auto auto; }
   .table-heading { display: none; }
   .status { margin: 4px 0 0; }
   .hand-heading h3 { font-size: 14px; }
@@ -455,14 +459,32 @@ function onCardClick(e: MouseEvent, card: Card) {
 @media (min-width: 560px) and (max-height: 500px) {
   .practice {
     display: grid;
-    grid-template-columns: minmax(294px, 1.15fr) minmax(236px, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas: 'table hand' 'table actions';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-content: start;
   }
-  .table { grid-area: table; }
-  .hand { grid-area: hand; align-self: end; }
-  .bar { grid-area: actions; }
-  .error { grid-column: 1 / -1; }
+  .lanes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lanes > :deep(.lane) {
+    grid-template-columns: minmax(0, 1fr) 88px;
+    gap: 4px;
+    padding: 4px;
+  }
+  .lanes :deep(.slots) { grid-area: 2 / 1 / 3 / -1; }
+  .lanes :deep(.move) { grid-area: 1 / 2; flex-direction: row; justify-content: center; gap: 0; }
+  .lanes :deep(.place-target) { margin-block: -8px; }
+  .lanes :deep(.lane.foul .label) { display: none; }
+  .status { min-height: calc(1.4em + 9px); }
+}
+
+@media (max-height: 500px) {
+  .practice:not(.showing-result) { --card-aspect: 1; }
+}
+
+@media (min-width: 560px) and (max-height: 360px) {
+  .practice { gap: 4px; }
+  .table { padding: 4px; }
+  .status { margin-top: 0; }
+  .hand-heading { display: none; }
 }
 
 @media (max-width: 559px) and (max-height: 550px) {

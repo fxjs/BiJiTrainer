@@ -163,6 +163,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (busy.value)
       return false
     await init()
+    if (busy.value || disposed)
+      return false
     const version = generation
     busy.value = true
     error.value = null
@@ -231,5 +233,25 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  return { user, identity, candidate, ready, busy, error, init, roll, enter, leave }
+  function retire(): Promise<boolean> {
+    const current = identity.value
+    if (!current)
+      return Promise.resolve(false)
+    return runAction(async (client, version) => {
+      const result = await client.rpc('retire_character', { p_character_id: current.id })
+      if (result.error)
+        throw result.error
+      if (version !== generation || disposed)
+        return
+      identity.value = null
+      candidate.value = null
+      const reserved = await client.rpc('reserve_character', { p_replace: false })
+      if (reserved.error)
+        throw reserved.error
+      if (version === generation && !disposed)
+        candidate.value = reserved.data as CharacterCandidate
+    })
+  }
+
+  return { user, identity, candidate, ready, busy, error, init, roll, enter, leave, retire }
 })

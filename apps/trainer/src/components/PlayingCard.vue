@@ -73,6 +73,7 @@ const aria = computed(() => (joker.value ? (props.card === BIG_JOKER ? '大王' 
 
 .pc.md {
   --w: var(--hand-card-width, 52px);
+  height: var(--hand-card-height, calc(var(--w) * var(--card-aspect, 1.4)));
 }
 
 .pc.lg {
