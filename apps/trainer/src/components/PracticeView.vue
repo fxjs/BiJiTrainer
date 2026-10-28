@@ -283,9 +283,9 @@ function onCardClick(e: MouseEvent, card: Card) {
 }
 
 .table {
-  flex: none;
+  flex: 1;
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto minmax(min-content, 1fr) auto;
   min-width: 0;
   padding: 12px;
   background: var(--table);
@@ -319,7 +319,7 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 .lanes {
   display: grid;
-  align-content: start;
+  align-content: stretch;
   gap: 8px;
 }
 
@@ -450,29 +450,40 @@ function onCardClick(e: MouseEvent, card: Card) {
 
 @media (max-height: 740px) {
   .practice { --lane-card-width: 44px; gap: 8px; }
-  .table { padding: 6px; grid-template-rows: auto auto; }
+  .table { padding: 6px; grid-template-rows: minmax(min-content, 1fr) auto; }
   .table-heading { display: none; }
   .status { margin: 4px 0 0; }
   .hand-heading h3 { font-size: 14px; }
 }
 
-@media (min-width: 560px) and (max-height: 500px) {
+@media (min-width: 560px) and (orientation: landscape) {
   .practice {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
-    align-content: start;
+    grid-template-columns: minmax(0, 1fr) 192px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: 'table table' 'hand actions';
   }
+  .table { grid-area: table; }
+  .hand { grid-area: hand; align-self: end; }
+  .pool { justify-content: start; }
+  .bar { grid-area: actions; grid-template-columns: repeat(2, minmax(0, 1fr)); display: grid; align-self: end; }
+  .bar .btn { padding: 8px 4px; font-size: 12px; white-space: nowrap; }
+  .bar .submit { min-width: 0; margin-left: 0; }
+  .error { grid-column: 1 / -1; }
   .lanes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lanes > :deep(.lane) {
     grid-template-columns: minmax(0, 1fr) 88px;
     gap: 4px;
+    align-content: center;
     padding: 4px;
   }
   .lanes :deep(.slots) { grid-area: 2 / 1 / 3 / -1; }
   .lanes :deep(.move) { grid-area: 1 / 2; flex-direction: row; justify-content: center; gap: 0; }
   .lanes :deep(.place-target) { margin-block: -8px; }
   .lanes :deep(.lane.foul .label) { display: none; }
+}
+
+@media (min-width: 560px) and (max-height: 500px) {
   .status { min-height: calc(1.4em + 9px); }
 }
 

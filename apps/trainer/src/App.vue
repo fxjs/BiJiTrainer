@@ -302,9 +302,10 @@ h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.025em; }
 .tabs {
   display: flex;
   gap: 6px;
-  padding: 5px;
-  border: 1px solid var(--rule);
-  border-radius: 12px;
+  padding: 0;
+  outline: 1px solid var(--rule);
+  outline-offset: -1px;
+  border-radius: 9px;
   background: var(--surface);
 }
 .tabs button {
@@ -344,9 +345,9 @@ main { min-width: 0; }
   h1 { font-size: 19px; }
   .sub { max-width: 30ch; font-size: 11px; }
   .top-actions { flex-direction: column-reverse; align-items: flex-end; gap: 0; }
-  .settings-button { padding: 8px 10px; min-height: 40px; font-size: 12px; }
+  .settings-button { padding: 8px 10px; min-height: 44px; font-size: 12px; }
   .cloud-button { min-height: 30px; padding: 5px 0; font-size: 10px; }
-  .tabs { gap: 2px; padding: 4px; }
+  .tabs { gap: 2px; }
   .tabs button { padding: 9px 5px; font-size: 12px; }
   .badge { margin-left: 1px; min-width: 15px; height: 15px; }
   .training-screen .cloud-button, .training-screen .settings-label { display: none; }
@@ -371,7 +372,7 @@ main { min-width: 0; }
   }
   .training-screen .cloud-button, .training-screen .settings-label { display: none; }
   .training-screen .settings-button { width: 44px; padding: 0; justify-content: center; }
-  .training-screen .tabs { grid-area: 1 / 1; padding: 3px; gap: 0; }
+  .training-screen .tabs { grid-area: 1 / 1; gap: 0; }
   .training-screen .tabs button { padding: 8px 2px; font-size: 12px; }
   .training-screen main { grid-area: 2 / 1 / 3 / -1; }
 }
