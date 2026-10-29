@@ -77,22 +77,22 @@ function onRowClick() {
       <button
         type="button"
         class="move-btn"
-        title="整道上移"
-        :aria-label="`${name}整道上移`"
+        title="整道移向头道"
+        :aria-label="`${name}整道移向头道`"
         :disabled="!canMoveUp"
         @click.stop="emit('move', 1)"
       >
-        ↑
+        <span class="move-arrow" aria-hidden="true">↑</span>
       </button>
       <button
         type="button"
         class="move-btn"
-        title="整道下移"
-        :aria-label="`${name}整道下移`"
+        title="整道移向尾道"
+        :aria-label="`${name}整道移向尾道`"
         :disabled="!canMoveDown"
         @click.stop="emit('move', -1)"
       >
-        ↓
+        <span class="move-arrow" aria-hidden="true">↓</span>
       </button>
     </div>
   </div>

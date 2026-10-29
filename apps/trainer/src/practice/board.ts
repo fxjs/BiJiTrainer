@@ -57,7 +57,7 @@ export function setCardSelected(b: Board, card: Card, selected: boolean): Board 
   }
 }
 
-/** 整道移动方向：+1 向头道（显示为上），−1 向尾道（显示为下） */
+/** 整道移动方向：+1 向头道（竖屏上、横屏左），−1 向尾道（竖屏下、横屏右） */
 export type LaneMove = -1 | 1
 
 /**

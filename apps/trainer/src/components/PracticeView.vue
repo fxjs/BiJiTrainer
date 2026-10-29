@@ -16,7 +16,7 @@ const { pool, lanes, foul, complete, selected, phase, result, error, sortMode, s
 
 const arranging = computed(() => phase.value === 'arranging')
 
-// 台面显示顺序：头道在上，尾道在下
+// 台面显示顺序：竖屏从上到下，横屏从左到右
 const order: Lane[] = [Lane.Head, Lane.Middle, Lane.Tail]
 
 /** 与某一道相关的倒水标记 */
@@ -48,7 +48,7 @@ const hint = computed(() => {
   if (selected.value.length > 0)
     return `已选 ${selected.value.length} 张，点某一道放入`
   if (complete.value)
-    return foul.value.any ? '可以提交，但会按倒水结算；可用 ↑↓ 整道换位' : '三道已摆满，可以提交'
+    return foul.value.any ? '可以提交，但会按倒水结算；可用箭头整道换位' : '三道已摆满，可以提交'
   return '选牌后点一道放入；点道内的牌撤回'
 })
 
@@ -485,6 +485,7 @@ function onCardClick(e: MouseEvent, card: Card) {
   }
   .lanes :deep(.slots) { grid-area: 2 / 1 / 3 / -1; }
   .lanes :deep(.move) { grid-area: 1 / 2; flex-direction: row; justify-content: center; gap: 0; }
+  .lanes :deep(.move-arrow) { transform: rotate(-90deg); }
   .lanes :deep(.place-target) { margin-block: -8px; }
   .lanes :deep(.lane.foul .label) { display: none; }
 }
