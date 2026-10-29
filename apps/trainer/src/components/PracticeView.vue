@@ -387,8 +387,8 @@ function onCardClick(e: MouseEvent, card: Card) {
   justify-content: center;
   align-content: start;
   gap: 4px;
-  min-height: calc(var(--hand-card-height) + 28px);
-  padding: 16px 0 12px;
+  min-height: calc(var(--hand-card-height) + 48px);
+  padding: 24px 0;
   /* Horizontal gestures select cards; vertical gestures remain native. */
   touch-action: pan-y;
   user-select: none;
@@ -466,11 +466,11 @@ function onCardClick(e: MouseEvent, card: Card) {
   .table { grid-area: table; }
   .hand { grid-area: hand; align-self: center; }
   .pool {
-    --hand-card-width: min(calc((100cqw - 32px) / 9), max(44px, 24dvh) / var(--card-aspect, 1.4));
+    --hand-card-width: min(clamp(44px, 14dvh, 64px), calc((100cqw - 64px) / 9));
     grid-template-columns: repeat(auto-fit, var(--hand-card-width));
     align-content: center;
-    min-height: calc(var(--hand-card-height) + 16px);
-    padding: 12px 0 4px;
+    min-height: calc(var(--hand-card-height) + 32px);
+    padding: 16px;
   }
   .bar { grid-area: actions; grid-template-columns: repeat(2, minmax(0, 1fr)); display: grid; align-self: end; }
   .bar .btn { padding: 8px 4px; font-size: 12px; white-space: nowrap; }
@@ -507,6 +507,8 @@ function onCardClick(e: MouseEvent, card: Card) {
 @media (max-width: 559px) and (max-height: 550px) {
   .practice:not(.showing-result) { --card-aspect: 1.15; }
   .hand-heading { display: none; }
+  .practice { gap: 6px; }
+  .pool { min-height: calc(var(--hand-card-height) + 32px); padding: 16px 0; }
 }
 
 @media (max-width: 559px) and (max-height: 500px) {
